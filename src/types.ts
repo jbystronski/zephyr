@@ -1,3 +1,5 @@
+import { createWorkflow } from "./workflow-composer.js";
+
 export type Action<I = any, O = any> = (args: I) => Promise<O>;
 
 export interface ActionRegistry {
@@ -32,3 +34,8 @@ export type WorkflowMiddleware<Reg extends ActionRegistry = any> = {
     next: () => Promise<any>,
   ): Promise<any>;
 };
+
+export type WF<
+  Reg extends ActionRegistry,
+  Context extends Record<string, any>,
+> = ReturnType<typeof createWorkflow<Reg, Context>>;
