@@ -39,3 +39,8 @@ export type WF<
   Reg extends ActionRegistry,
   Context extends Record<string, any>,
 > = ReturnType<typeof createWorkflow<Reg, Context>>;
+// TODO: this needs enforcing
+type Observer = (
+  frame: Readonly<ExecutionFrame>,
+  extras: Record<string, any>,
+) => void | Promise<void>;
