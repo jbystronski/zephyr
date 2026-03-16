@@ -40,9 +40,7 @@ export function workflowModule<
     wf,
     ...flows,
 
-    extend<Extra extends Record<string, any>>(
-      overrides: Partial<Flows> & Extra,
-    ): Flows & Extra {
+    extend<Extra extends Record<string, any>>(overrides: Extra): Flows & Extra {
       return {
         ...flows,
         ...overrides,
