@@ -736,10 +736,10 @@ export class WorkflowBuilder<
     Prefix extends string,
     SubInput,
     SubResults,
-    SubSteps extends StepDef<Reg, any, any>[],
+    SubSteps extends StepDef<any, any, any>[],
   >(
     prefix: Prefix,
-    workflow: WorkflowDef<Reg, SubInput, SubResults, SubSteps>,
+    workflow: WorkflowDef<any, SubInput, SubResults, SubSteps>,
     resolveInput: (ctx: {
       input: Input;
       results: Results;
