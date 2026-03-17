@@ -152,11 +152,15 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>(
 
         const core = async () => {
           frame.attempts++;
-          frame.input = step.resolve({ input, results });
+          frame.input = step.resolve?.({ input, results }) ?? undefined;
 
           try {
             const action = registry[step.action];
-            const result = await action(frame.input);
+            const result =
+              frame.input === undefined
+                ? await (action as () => Promise<any>)()
+                : await action(frame.input);
+            // const result = await action(frame.input);
             frame.output = result;
             frame.end = Date.now();
 
