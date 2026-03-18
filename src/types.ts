@@ -68,6 +68,7 @@ export type ExecutionFrame = {
   input?: any;
   output?: any;
   error?: any;
+  skipped?: boolean;
 };
 
 // export type ActionParams<

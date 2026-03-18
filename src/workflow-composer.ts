@@ -1645,10 +1645,15 @@ export class WorkflowBuilder<
     id: ID,
     action: ActionName,
     resolve?: ActionParams<Reg, ActionName> extends []
-      ? (ctx?: { input: Input; results: Results }) => undefined
+      ? (ctx?: {
+          input: Input;
+          results: Results;
+          context: Context;
+        }) => undefined
       : (ctx: {
           input: Input;
           results: Results;
+          context: Context;
         }) => ActionParams<Reg, ActionName>,
   ) {
     return this.step(id, action, resolve, [...this.frontier]);
@@ -1714,6 +1719,21 @@ export class WorkflowBuilder<
     );
 
     return this as any;
+  }
+
+  when(
+    predicate: (ctx: {
+      input: Input;
+      results: Results;
+      context: Context;
+    }) => boolean,
+  ): this {
+    const lastStep = this.steps[this.steps.length - 1];
+    if (!lastStep) {
+      throw new Error("when() must follow a step");
+    }
+    lastStep.when = predicate;
+    return this;
   }
 
   output<Output>(
