@@ -248,14 +248,22 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>(
           start: Date.now(),
         };
         extras.frames[stepId] = frame;
-
-        const ctx = { stepId, input, results, registry, extras, frame };
+        const context = (workflow as any).__context;
+        const ctx = {
+          stepId,
+          input,
+          results,
+          context,
+          registry,
+          extras,
+          frame,
+        };
 
         const core = async () => {
           frame.attempts++;
 
           // 👇 Get the resolved arguments (should be a tuple or undefined)
-          const resolvedArgs = step.resolve?.({ input, results });
+          const resolvedArgs = step.resolve?.({ input, results, context });
           frame.input = resolvedArgs;
 
           try {

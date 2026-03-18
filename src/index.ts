@@ -7,4 +7,5 @@ export * from "./utils.js";
 export * from "./types.js";
 export * from "./utils.js";
 export * from "./node/index.js";
+export * from "./session.js";
 export { useMetrics, useLog } from "./middleware.js";

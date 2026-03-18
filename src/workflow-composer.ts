@@ -1503,6 +1503,7 @@ export type WorkflowDef<
   input: Input;
   results: Results;
   outputResolver?: (ctx: any) => Output;
+  __context?: any;
 };
 
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
@@ -1733,6 +1734,7 @@ export class WorkflowBuilder<
       input: {} as Input,
       results: {} as Results,
       outputResolver: this.outputResolver,
+      __context: this.context,
     };
   }
 
