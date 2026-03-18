@@ -46,19 +46,20 @@ type Input<F extends AnyFn> = Parameters<F>[0];
 type Output<F extends AnyFn> = Awaited<ReturnType<F>>;
 
 /**
- * For generic actions where you want to specify the return type
- * Just a type helper, does nothing at runtime
+ * For generic actions - preserves the generic parameter
  */
 export function genericAction<F extends AnyFn>(fn: F) {
-  return <T = ReturnType<F>>(): ((...args: Parameters<F>) => T) =>
-    fn as (...args: Parameters<F>) => T;
+  // Return a function that takes a type parameter and returns the typed function
+  return <T>(): ((...args: Parameters<F>) => ReturnType<F>) => {
+    return fn as (...args: Parameters<F>) => ReturnType<F>;
+  };
 }
 
 /**
- * For fixed actions - just returns the function
- * The type parameter T is for convenience when you want to override the return type
+ * For fixed actions
  */
 export function fixedAction<F extends AnyFn>(fn: F) {
-  return <T = ReturnType<F>>(): ((...args: Parameters<F>) => T) =>
-    fn as (...args: Parameters<F>) => T;
+  return (): ((...args: Parameters<F>) => ReturnType<F>) => {
+    return fn as (...args: Parameters<F>) => ReturnType<F>;
+  };
 }
