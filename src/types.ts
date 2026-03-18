@@ -51,10 +51,10 @@ export type Action<
   F extends (...args: any[]) => any = (...args: any[]) => any,
 > = F;
 
-export interface ActionRegistry {
-  [key: string]: Action;
-}
-
+// export interface ActionRegistry {
+//   [key: string]: Action;
+// }
+export type ActionRegistry = Record<string, (...args: any[]) => any>;
 export type MergeActionRegistries<
   A extends ActionRegistry,
   B extends ActionRegistry,
@@ -70,16 +70,28 @@ export type ExecutionFrame = {
   error?: any;
 };
 
-export type ActionParams<
-  Reg extends ActionRegistry,
-  K extends keyof Reg,
-> = Parameters<Reg[K]>;
+// export type ActionParams<
+//   Reg extends ActionRegistry,
+//   K extends keyof Reg,
+// > = Parameters<Reg[K]>;
+//
+// // 👇 Helper to extract return type from any action (unwraps Promise)
+// export type ActionReturn<
+//   Reg extends ActionRegistry,
+//   K extends keyof Reg,
+// > = Awaited<ReturnType<Reg[K]>>;
 
-// 👇 Helper to extract return type from any action (unwraps Promise)
-export type ActionReturn<
-  Reg extends ActionRegistry,
-  K extends keyof Reg,
-> = Awaited<ReturnType<Reg[K]>>;
+export type ActionParams<Reg, K extends keyof Reg> = Reg[K] extends (
+  ...args: infer P
+) => any
+  ? P
+  : never;
+
+export type ActionReturn<Reg, K extends keyof Reg> = Reg[K] extends (
+  ...args: any[]
+) => infer R
+  ? Awaited<R>
+  : never;
 
 export type WorkflowMiddleware<Reg extends ActionRegistry = any> = {
   (
