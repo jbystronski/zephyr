@@ -41,7 +41,7 @@
 //
 
 // Just type helpers - no runtime wrappers needed
-type AnyFn = (...args: any[]) => Promise<any>;
+type AnyFn = (...args: any[]) => any;
 type Input<F extends AnyFn> = Parameters<F>[0];
 type Output<F extends AnyFn> = Awaited<ReturnType<F>>;
 
@@ -50,7 +50,8 @@ type Output<F extends AnyFn> = Awaited<ReturnType<F>>;
  * Just a type helper, does nothing at runtime
  */
 export function genericAction<F extends AnyFn>(fn: F) {
-  return <T = Output<F>>() => fn as (args: Input<F>) => Promise<T>;
+  return <T = ReturnType<F>>(): ((...args: Parameters<F>) => T) =>
+    fn as (...args: Parameters<F>) => T;
 }
 
 /**
@@ -58,6 +59,6 @@ export function genericAction<F extends AnyFn>(fn: F) {
  * The type parameter T is for convenience when you want to override the return type
  */
 export function fixedAction<F extends AnyFn>(fn: F) {
-  return <T = Output<F>>(): ((args: Input<F>) => Promise<T>) =>
-    fn as (args: Input<F>) => Promise<T>;
+  return <T = ReturnType<F>>(): ((...args: Parameters<F>) => T) =>
+    fn as (...args: Parameters<F>) => T;
 }
