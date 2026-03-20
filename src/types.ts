@@ -21,17 +21,6 @@ export type ExecutionFrame = {
   skipped?: boolean;
 };
 
-// export type ActionParams<
-//   Reg extends ActionRegistry,
-//   K extends keyof Reg,
-// > = Parameters<Reg[K]>;
-//
-// // 👇 Helper to extract return type from any action (unwraps Promise)
-// export type ActionReturn<
-//   Reg extends ActionRegistry,
-//   K extends keyof Reg,
-// > = Awaited<ReturnType<Reg[K]>>;
-
 export type ActionParams<Reg, K extends keyof Reg> = Reg[K] extends (
   ...args: infer P
 ) => any
