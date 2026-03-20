@@ -1,4 +1,4 @@
-import { ActionRegistry, WorkflowMiddleware } from "./types.js";
+import { ActionRegistry, WorkflowObserver } from "./types.js";
 import { WorkflowDef } from "./workflow-composer.js";
 import { executeWorkflow } from "./workflow-executor.js";
 import { createModule } from "./workflow-module.js";
@@ -16,7 +16,7 @@ export class WorkflowSession<
   private running = false;
   private queue: Array<{ key: keyof ModuleFlows<Reg>; input: any }> = [];
   public state: State; // session state & workflow context are the same object
-  public middleware: WorkflowMiddleware[] = [];
+  public observers: WorkflowObserver[] = [];
   private moduleFlows: ModuleFlows<Reg>;
 
   /**
@@ -28,11 +28,11 @@ export class WorkflowSession<
     baseModule: ModuleFlows<Reg>,
     private registry: Reg,
     initialContext: State,
-    middleware: WorkflowMiddleware[],
+    observers: WorkflowObserver[],
   ) {
     // Use the same object for session state and module context
     this.state = initialContext;
-    this.middleware = middleware;
+    this.observers = observers;
 
     // Per-session module: inherits workflows, shares the same state/context object
     this.moduleFlows = createModule({
@@ -73,7 +73,7 @@ export class WorkflowSession<
       if (!workflow) throw new Error(`Workflow ${String(key)} not found`);
 
       // state/context already lives on the module; no need to pass a separate context
-      await executeWorkflow(workflow, this.registry, input, this.middleware);
+      await executeWorkflow(workflow, this.registry, input, this.observers);
 
       // Notify subscribers after workflow mutates state
       this.notify();
