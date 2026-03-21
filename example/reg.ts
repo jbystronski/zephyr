@@ -2,8 +2,6 @@ import {
   fixedAction,
   createWorkflow,
   createActionRegistry,
-  defineNode,
-  TasksFromFns,
 } from "../src/index.js";
 
 const log = fixedAction(async (input: { toLog: any }) => {
@@ -34,23 +32,6 @@ const baseActions = createActionRegistry().action("logger", log());
 
 const numericActions = createActionRegistry().action("multiply", multiply());
 const toUppercase = async (input: { text: string }) => input.text.toUpperCase();
-
-export const nodeOne = defineNode<
-  TasksFromFns<{
-    test: typeof toUppercase;
-  }>,
-  {
-    baseV: string;
-  },
-  string
->({
-  test: {
-    fn: toUppercase,
-    argMap: (r) => ({ text: r._init.baseV }),
-  },
-
-  _output: (r) => r.test,
-});
 
 export const opsRegistry = createActionRegistry()
   .extend(baseActions)
