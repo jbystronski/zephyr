@@ -371,29 +371,6 @@ import { ActionParams, ActionRegistry, ActionReturn } from "./types.js";
 /* STEP INPUT NORMALIZATION TYPES                  */
 /* ------------------------------------------------ */
 
-type StepBuilderResult<WB, ID extends string, Default> = WB & {
-  as<Override>(): OverrideStepResult<WB, ID, Override>;
-};
-
-type OverrideStepResult<WB, ID extends string, Override> =
-  WB extends WorkflowBuilder<
-    infer Reg,
-    infer Input,
-    infer Context,
-    infer Steps,
-    infer Results,
-    infer Output
-  >
-    ? WorkflowBuilder<
-        Reg,
-        Input,
-        Context,
-        Steps,
-        Omit<Results, ID> & { [K in ID]: Override },
-        Output
-      >
-    : never;
-
 type NormalizedCall =
   | { kind: "none" }
   | { kind: "positional"; args: any[] }
@@ -542,7 +519,9 @@ export class WorkflowBuilder<
   //   Input,
   //   Context,
   //   [...Steps, StepDef<Reg, ID, ActionName>],
-  //   Results & { [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut> }
+  //   Results & {
+  //     [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut>;
+  //   }
   // > {
   //   const deps = dependsOn ?? [...this.frontier];
   //
@@ -555,14 +534,9 @@ export class WorkflowBuilder<
   //
   //   this.frontier = [id];
   //
-  //   // with Override
-  //
   //   return this as any;
   // }
 
-  /* ------------------------------------------------ */
-  /* Base Step                                       */
-  /* ------------------------------------------------ */
   step<
     ID extends string,
     ActionName extends keyof Reg & string,
@@ -579,19 +553,14 @@ export class WorkflowBuilder<
     ) => ResolveOut,
     dependsOn?: string[],
     options?: {},
-  ): StepBuilderResult<
-    WorkflowBuilder<
-      Reg,
-      Input,
-      Context,
-      [...Steps, StepDef<Reg, ID, ActionName>],
-      Results & {
-        [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut>;
-      },
-      Output
-    >,
-    ID,
-    StepResultFromResolve<Reg, ActionName, ResolveOut>
+  ): WorkflowBuilder<
+    Reg,
+    Input,
+    Context,
+    [...Steps, StepDef<Reg, ID, ActionName>],
+    Results & {
+      [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut>;
+    }
   > {
     const deps = dependsOn ?? [...this.frontier];
 
@@ -604,23 +573,15 @@ export class WorkflowBuilder<
 
     this.frontier = [id];
 
-    // with Override
-
-    const next = this as any;
-
-    (next as any).as = <Override>() => {
-      return next as OverrideStepResult<typeof next, ID, Override>;
-    };
-    return next;
-    // return this as any;
+    return this as any;
   }
 
   /* ------------------------------------------------ */
   /* Sequential shortcut                             */
   /* ------------------------------------------------ */
   seq<
-    ID extends string,
-    ActionName extends keyof Reg & string,
+    ID extends string = string,
+    ActionName extends keyof Reg & string = any,
     ResolveOut extends ResolvedStepInput = ResolvedStepInput,
   >(
     id: ID,
@@ -641,6 +602,25 @@ export class WorkflowBuilder<
       undefined,
       options,
     );
+  }
+
+  /* ------------------------------------------------ */
+  /* Override the result of the last step            */
+  /* ------------------------------------------------ */
+  as<NewType>(): WorkflowBuilder<
+    Reg,
+    Input,
+    Context,
+    Steps,
+    // Override the result of the last step only
+    Steps extends [...infer Rest, infer Last]
+      ? Last extends StepDef<Reg, infer ID, any>
+        ? Omit<Results, ID> & { [K in ID]: NewType }
+        : Results
+      : Results,
+    Output
+  > {
+    return this as any;
   }
 
   /* ------------------------------------------------ */
@@ -691,8 +671,8 @@ export class WorkflowBuilder<
   /* Join helper                                     */
   /* ------------------------------------------------ */
   join<
-    ID extends string,
-    ActionName extends keyof Reg & string,
+    ID extends string = string,
+    ActionName extends keyof Reg & string = any,
     ResolveOut extends ResolvedStepInput = ResolvedStepInput,
   >(
     id: ID,

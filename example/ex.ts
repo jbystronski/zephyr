@@ -15,7 +15,7 @@ export const regOne = {
   double: (n: number) => n * 2,
   lowercase: (v: string) => v.toLowerCase(),
   addSuffix: (v: string, suffix: string) => v + suffix,
-
+  noop: () => {},
   justLog: async () => {
     console.log("check");
   },
@@ -64,7 +64,20 @@ export const modA = createModule({
 
       .seq("addSuffix", "uppercase", (ctx) => ctx.obj({ text: "22" }))
 
-      .output((ctx) => ({ result: ctx.results.addSuffix }));
+      // .as<number>()
+
+      .parallel((b1) =>
+        b1.seq("b1", "uppercase", (ctx) =>
+          ctx.obj({ text: ctx.results.addSuffix }),
+        ),
+      )
+      .join("join", "noop", (ctx) => {
+        return ctx.none();
+      })
+      .output((ctx) => ({
+        result: ctx.results.addSuffix,
+        parRes: ctx.results.b1,
+      }));
 
     const a2 = wf<{ v: string }>("a2")
       .subflow("asub", a1, (ctx) => ({ value: "foo", another: 22 }))
