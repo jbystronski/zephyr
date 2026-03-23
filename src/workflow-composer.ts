@@ -371,6 +371,29 @@ import { ActionParams, ActionRegistry, ActionReturn } from "./types.js";
 /* STEP INPUT NORMALIZATION TYPES                  */
 /* ------------------------------------------------ */
 
+type StepBuilderResult<WB, ID extends string, Default> = WB & {
+  as<Override>(): OverrideStepResult<WB, ID, Override>;
+};
+
+type OverrideStepResult<WB, ID extends string, Override> =
+  WB extends WorkflowBuilder<
+    infer Reg,
+    infer Input,
+    infer Context,
+    infer Steps,
+    infer Results,
+    infer Output
+  >
+    ? WorkflowBuilder<
+        Reg,
+        Input,
+        Context,
+        Steps,
+        Omit<Results, ID> & { [K in ID]: Override },
+        Output
+      >
+    : never;
+
 type NormalizedCall =
   | { kind: "none" }
   | { kind: "positional"; args: any[] }
@@ -498,6 +521,48 @@ export class WorkflowBuilder<
   /* ------------------------------------------------ */
   /* Base Step                                       */
   /* ------------------------------------------------ */
+  // step<
+  //   ID extends string,
+  //   ActionName extends keyof Reg & string,
+  //   ResolveOut extends ResolvedStepInput = ResolvedStepInput,
+  // >(
+  //   id: ID,
+  //   action: ActionName,
+  //   resolve?: (
+  //     ctx: {
+  //       input: Input;
+  //       results: Results;
+  //       context: Context;
+  //     } & CallHelpers<Reg, ActionName>,
+  //   ) => ResolveOut,
+  //   dependsOn?: string[],
+  //   options?: {},
+  // ): WorkflowBuilder<
+  //   Reg,
+  //   Input,
+  //   Context,
+  //   [...Steps, StepDef<Reg, ID, ActionName>],
+  //   Results & { [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut> }
+  // > {
+  //   const deps = dependsOn ?? [...this.frontier];
+  //
+  //   this.steps.push({
+  //     id,
+  //     action,
+  //     resolve: resolve ?? (() => ({ kind: "none" })),
+  //     dependsOn: deps,
+  //   });
+  //
+  //   this.frontier = [id];
+  //
+  //   // with Override
+  //
+  //   return this as any;
+  // }
+
+  /* ------------------------------------------------ */
+  /* Base Step                                       */
+  /* ------------------------------------------------ */
   step<
     ID extends string,
     ActionName extends keyof Reg & string,
@@ -514,12 +579,19 @@ export class WorkflowBuilder<
     ) => ResolveOut,
     dependsOn?: string[],
     options?: {},
-  ): WorkflowBuilder<
-    Reg,
-    Input,
-    Context,
-    [...Steps, StepDef<Reg, ID, ActionName>],
-    Results & { [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut> }
+  ): StepBuilderResult<
+    WorkflowBuilder<
+      Reg,
+      Input,
+      Context,
+      [...Steps, StepDef<Reg, ID, ActionName>],
+      Results & {
+        [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut>;
+      },
+      Output
+    >,
+    ID,
+    StepResultFromResolve<Reg, ActionName, ResolveOut>
   > {
     const deps = dependsOn ?? [...this.frontier];
 
@@ -532,7 +604,15 @@ export class WorkflowBuilder<
 
     this.frontier = [id];
 
-    return this as any;
+    // with Override
+
+    const next = this as any;
+
+    (next as any).as = <Override>() => {
+      return next as OverrideStepResult<typeof next, ID, Override>;
+    };
+    return next;
+    // return this as any;
   }
 
   /* ------------------------------------------------ */
@@ -638,60 +718,6 @@ export class WorkflowBuilder<
   /* ------------------------------------------------ */
   /* Subflow                                         */
   /* ------------------------------------------------ */
-  // subflow<
-  //   Prefix extends string,
-  //   SubInput,
-  //   SubResults,
-  //   SubSteps extends StepDef<Reg, any, any>[],
-  //   SubOutput,
-  // >(
-  //   prefix: Prefix,
-  //   workflow: WorkflowDef<Reg, SubInput, SubResults, SubSteps, SubOutput>,
-  //   resolveInput?: (ctx: {
-  //     input: Input;
-  //     results: Results;
-  //     context: Context;
-  //   }) => SubInput,
-  //   options?: { loop?: boolean },
-  // ): WorkflowBuilder<
-  //   Reg,
-  //   Input,
-  //   Context,
-  //   [...Steps, ...SubSteps],
-  //   Results & { [K in Prefix]: SubflowResult<SubResults, SubOutput> }
-  // > {
-  //   const idMap = new Map<string, string>();
-  //
-  //   workflow.steps.forEach((step) => {
-  //     idMap.set(step.id, `${prefix}.${step.id}`);
-  //   });
-  //
-  //   workflow.steps.forEach((step) => {
-  //     const newStep: StepDef<Reg, any, any> = {
-  //       ...step,
-  //       id: idMap.get(step.id)!,
-  //       dependsOn: step.dependsOn.map((d) => idMap.get(d)!),
-  //       resolve: (ctx: any) => {
-  //         const subInput = resolveInput ? resolveInput(ctx) : undefined;
-  //         return step.resolve({
-  //           input: subInput,
-  //           results: ctx.results,
-  //           context: ctx.context,
-  //         });
-  //       },
-  //       ...(options ? { loop: options.loop ?? step.loop } : {}),
-  //     };
-  //
-  //     if (workflow.entrySteps.find((e) => e.id === step.id)) {
-  //       newStep.dependsOn = [...this.frontier];
-  //     }
-  //
-  //     this.steps.push(newStep);
-  //   });
-  //
-  //   this.frontier = workflow.endSteps.map((e) => idMap.get(e.id)!);
-  //   return this as any;
-  // }
 
   subflow<
     Prefix extends string,
