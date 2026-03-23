@@ -495,48 +495,6 @@ export class WorkflowBuilder<
     private context: Context,
   ) {}
 
-  /* ------------------------------------------------ */
-  /* Base Step                                       */
-  /* ------------------------------------------------ */
-  // step<
-  //   ID extends string,
-  //   ActionName extends keyof Reg & string,
-  //   ResolveOut extends ResolvedStepInput = ResolvedStepInput,
-  // >(
-  //   id: ID,
-  //   action: ActionName,
-  //   resolve?: (
-  //     ctx: {
-  //       input: Input;
-  //       results: Results;
-  //       context: Context;
-  //     } & CallHelpers<Reg, ActionName>,
-  //   ) => ResolveOut,
-  //   dependsOn?: string[],
-  //   options?: {},
-  // ): WorkflowBuilder<
-  //   Reg,
-  //   Input,
-  //   Context,
-  //   [...Steps, StepDef<Reg, ID, ActionName>],
-  //   Results & {
-  //     [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut>;
-  //   }
-  // > {
-  //   const deps = dependsOn ?? [...this.frontier];
-  //
-  //   this.steps.push({
-  //     id,
-  //     action,
-  //     resolve: resolve ?? (() => ({ kind: "none" })),
-  //     dependsOn: deps,
-  //   });
-  //
-  //   this.frontier = [id];
-  //
-  //   return this as any;
-  // }
-
   step<
     ID extends string,
     ActionName extends keyof Reg & string,
