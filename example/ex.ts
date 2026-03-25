@@ -1,4 +1,4 @@
-import { createRunner, useLog } from "../src/index.js";
+import { createModuleRunner, createRunner, useLog } from "../src/index.js";
 import { WF } from "../src/types.js";
 
 import { executeWorkflow } from "../src/workflow-executor.js";
@@ -42,8 +42,10 @@ const modWithLoop = createModule({
   },
 });
 
-const runner = createRunner(regOne);
+const modWithLoopRunner = createModuleRunner(modWithLoop, regOne);
 
+const r0 = await modWithLoopRunner("loopWorkflo", { items: [] });
+const runner = createRunner(regOne);
 const r1 = await runner(
   modWithLoop.loopWorkflow,
   { items: ["BERRY", "APPEL"] },

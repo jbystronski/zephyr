@@ -39,3 +39,34 @@ export function createRunner<Reg extends ActionRegistry>(registry: Reg) {
     return executeWorkflow(workflow, registry, input, observers ?? []);
   };
 }
+
+type ModuleWithRegistry<
+  M extends Record<string, WorkflowDef<any, any, any, any, any>>,
+  Reg,
+> = {
+  __registry: Reg;
+} & M;
+
+/**
+ * Create a typed runner for a specific module
+ * @example
+ * const run = createModuleRunner(modWithLoop, regOne);
+ * const result = await run("loopWorkflow", { items: ["APPLE"] });
+ */
+export function createModuleRunner<
+  M extends Record<string, WorkflowDef<any, any, any, any, any>>,
+  Reg extends ActionRegistry,
+>(module: M, registry: Reg) {
+  return async <K extends keyof M>(
+    key: K,
+    input: M[K] extends WorkflowDef<Reg, infer I, any, any, any> ? I : never,
+    observers?: any[],
+  ): Promise<{
+    output: M[K] extends WorkflowDef<Reg, any, any, any, infer O> ? O : never;
+    results: M[K] extends WorkflowDef<Reg, any, infer R, any, any> ? R : never;
+    extras: Record<string, any>;
+  }> => {
+    const workflow = module[key];
+    return executeWorkflow(workflow, registry, input, observers ?? []);
+  };
+}
