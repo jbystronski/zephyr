@@ -15,6 +15,48 @@ function createCallHelpers() {
   };
 }
 
+// Helper to wrap action execution with timeout
+async function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
+  if (!ms) return promise;
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout")), ms),
+    ),
+  ]);
+}
+
+// Helper to run action with retry support
+async function runWithRetry(
+  actionFn: () => Promise<any>,
+  stepOptions?: {
+    retry?: number;
+    retryDelay?: number | ((attempt: number) => number);
+  },
+): Promise<any> {
+  const maxRetries = stepOptions?.retry ?? 0;
+  let lastError: any;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await actionFn();
+    } catch (err) {
+      lastError = err;
+
+      if (attempt === maxRetries) break;
+
+      const delay = stepOptions?.retryDelay;
+      if (typeof delay === "number") {
+        await new Promise((r) => setTimeout(r, delay));
+      } else if (typeof delay === "function") {
+        await new Promise((r) => setTimeout(r, delay(attempt)));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export async function executeWorkflow<
   Reg extends ActionRegistry,
   I,
@@ -125,9 +167,16 @@ export async function executeWorkflow<
           const resolvedArgs = step.resolve?.(stepCtx);
           frame.input = resolvedArgs;
 
-          try {
+          const actionFn = async () => {
             const action = registry[step.action];
-            const result = await runAction(resolvedArgs, action);
+            return await runAction(resolvedArgs, action);
+          };
+
+          try {
+            const result = await withTimeout(
+              runWithRetry(actionFn, step.options),
+              step.options?.timeout,
+            );
 
             frame.output = result;
             frame.end = Date.now();
@@ -136,6 +185,18 @@ export async function executeWorkflow<
           } catch (err) {
             frame.error = err;
             frame.end = Date.now();
+
+            if (step.options?.onError) {
+              const fallback = step.options.onError(err, ctx);
+              results[step.id] = fallback;
+              return fallback;
+            }
+
+            if (step.options?.continueOnError) {
+              results[step.id] = undefined;
+              return undefined;
+            }
+
             throw err;
           }
         };

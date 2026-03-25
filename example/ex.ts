@@ -16,8 +16,8 @@ export const regOne = {
   lowercase: (v: string) => v.toLowerCase(),
   addSuffix: (v: string, suffix: string) => v + suffix,
   noop: () => {},
-  justLog: async () => {
-    console.log("check");
+  justLog: async (v: any) => {
+    console.log(v);
   },
 };
 
@@ -68,31 +68,57 @@ export const modA = createModule({
   registry: regOne,
   context: { suffix: "!" }, // example of context
   define: ({ wf, deps }) => {
-    const jl = wf("jl").seq("#l", "justLog").build();
+    const ja = wf("jl")
+      .seq("#l", "justLog")
+      .seq("j1_upp", "uppercase", (ctx) => ctx.obj({ text: "cat" }))
+      .output((ctx) => ({ ja_result: ctx.results.j1_upp }));
     const a1 = wf<{ value: string; another: number }>("a1")
-      .seq("upper", "uppercase", (ctx) => ctx.obj({ text: ctx.input.value }))
+      .seq("upper", "uppercase", (ctx) => ctx.obj({ text: ctx.input.value }), {
+        onError: (err, ctx) => {
+          throw Error(err);
+        },
+      })
+      .as<string>()
+      .seq("xyz", "uppercase", (ctx) => ctx.obj({ text: ctx.input.value }))
+      .when((ctx) => true)
+      .seq("condA", "addSuffix", (ctx) => ctx.args("one", "!!!"))
+      .as<string | undefined>()
+      .endWhen()
+      .subflow("subA", ja, (ctx) => ({}))
 
+      .parallel(
+        (b1) =>
+          b1
+            .seq("b1_action", "uppercase", (ctx) => ctx.obj({ text: "ssss" }))
+            .parallel((b0) =>
+              b0.seq("deep_action", "justLog", (ctx) => ctx.args("deep")),
+            )
+            .join("deepJoin", "justLog", (ctx) =>
+              ctx.args(ctx.results.deep_action),
+            ),
+
+        (b2) => b2.seq("logB", "justLog", (ctx) => ctx.args("B")),
+      )
+      .join("joinConditions", "uppercase", (ctx) =>
+        ctx.obj({ text: ctx.results.b1_action }),
+      )
       .seq("addSuffix", "uppercase", (ctx) => ctx.obj({ text: "22" }))
 
-      // .as<number>()
-
-      .parallel((b1) =>
-        b1.seq("b1", "uppercase", (ctx) =>
+      .parallel((nextParrall) =>
+        nextParrall.seq("kkkkkkkkkkkk", "uppercase", (ctx) =>
           ctx.obj({ text: ctx.results.addSuffix }),
         ),
       )
-      .join("join", "noop", (ctx) => {
-        return ctx.none();
+      .join("join", "uppercase", (ctx) => {
+        return ctx.obj({ text: ctx.results.b1_action });
       })
       .output((ctx) => ({
-        result: ctx.results.addSuffix,
-        parRes: ctx.results.b1,
+        parRes: ctx.results.deep_action,
+        subflowRes: ctx.results.subA.ja_result,
+        optResult: ctx.results.condA,
       }));
 
-    const a2 = wf<{ v: string }>("a2")
-      .subflow("asub", a1, (ctx) => ({ value: "foo", another: 22 }))
-      .output((ctx) => ({ res: ctx.results.asub.result }));
-    return { jl, a1 };
+    return { ja, a1 };
   },
 });
 
