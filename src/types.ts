@@ -8,7 +8,7 @@ export type ActionRegistry = Record<string, (...args: any[]) => any>;
 export type MergeActionRegistries<
   A extends ActionRegistry,
   B extends ActionRegistry,
-> = Omit<A, keyof B> & B;
+> = Simplify<Omit<A, keyof B> & B>;
 
 export type ExecutionFrame = {
   stepId: string;
@@ -20,6 +20,10 @@ export type ExecutionFrame = {
   error?: any;
   skipped?: boolean;
 };
+
+export type Simplify<T> = {
+  [K in keyof T]: T[K];
+} & {};
 
 export type ActionParams<Reg, K extends keyof Reg> = Reg[K] extends (
   ...args: infer P

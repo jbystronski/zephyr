@@ -103,6 +103,7 @@ export const modA = createModule({
         ctx.obj({ text: ctx.results.b1_action }),
       )
       .seq("addSuffix", "uppercase", (ctx) => ctx.obj({ text: "22" }))
+      .as<string | undefined>()
 
       .parallel((nextParrall) =>
         nextParrall.seq("kkkkkkkkkkkk", "uppercase", (ctx) =>
