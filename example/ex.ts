@@ -133,7 +133,7 @@ export const modB = createModule({
       .subflow("aFlowPre", deps.jl, (ctx) => ({}))
       .subflow("aFlow", deps.a1, () => ({ value: "a", another: 2 }))
       .seq("doubleLength", "double", (ctx) => ctx.args(300))
-      .output((ctx) => ({ result: ctx.results.aFlow.result })),
+      .output((ctx) => ({ result: "abc" })),
   }),
 });
 

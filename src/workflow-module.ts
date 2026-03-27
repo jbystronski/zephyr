@@ -1,4 +1,4 @@
-import { ActionRegistry } from "./types.js";
+import { ActionRegistry, Simplify } from "./types.js";
 import {
   createWorkflow,
   WorkflowBuilder,
@@ -38,12 +38,32 @@ export type ModuleContext<
   ) => T;
 };
 
+function mergeModules(mods: ModuleShape[]): ModuleShape {
+  const seen = new Set<string>();
+  const result: ModuleShape = {};
+
+  for (const mod of mods) {
+    for (const key in mod) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        result[key] = mod[key];
+      }
+    }
+  }
+
+  return result;
+}
+
 export function createModule<
   Reg extends ActionRegistry,
   Context extends Record<string, any>,
   Use extends ModuleShape[] = [],
-  Deps extends ModuleShape = UnionToIntersectionOrEmpty<Use[number]> &
-    ModuleShape,
+  // Deps extends ModuleShape = UnionToIntersectionOrEmpty<Use[number]> &
+  //   ModuleShape,
+  Deps extends ModuleShape = Simplify<{
+    [K in keyof UnionToIntersectionOrEmpty<Use[number]>]: AnyWorkflow;
+  }>,
+  // Deps extends ModuleShape = Simplify<UnionToIntersectionOrEmpty<Use[number]>>,
   Own extends ModuleShape = {},
 >({
   registry,
@@ -58,8 +78,8 @@ export function createModule<
 }): Deps & Own {
   const wf = createWorkflow(registry, context);
 
-  const deps = (use ? Object.assign({}, ...use) : {}) as Deps;
-
+  // const deps = (use ? Object.assign({}, ...use) : {}) as Deps;
+  const deps = (use ? mergeModules(use) : {}) as Deps;
   const moduleCtx: ModuleContext<Reg, Context, Deps> = {
     wf,
     deps,

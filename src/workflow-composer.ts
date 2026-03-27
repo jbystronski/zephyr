@@ -1,4 +1,9 @@
-import { ActionParams, ActionRegistry, ActionReturn } from "./types.js";
+import {
+  ActionParams,
+  ActionRegistry,
+  ActionReturn,
+  Simplify,
+} from "./types.js";
 
 /* ------------------------------------------------ */
 /* STEP INPUT NORMALIZATION TYPES                  */
@@ -125,6 +130,29 @@ type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
   ? I
   : never;
 
+type MergeBranchResults<
+  Branches extends readonly any[],
+  Acc,
+> = Branches extends readonly [infer Head, ...infer Tail]
+  ? MergeBranchResults<
+      Tail,
+      Acc & (Head extends WorkflowBuilder<any, any, any, any, infer R> ? R : {})
+    >
+  : Acc;
+
+type MergeBranchSteps<
+  Branches extends readonly any[],
+  Acc extends any[],
+> = Branches extends readonly [infer Head, ...infer Tail]
+  ? MergeBranchSteps<
+      Tail,
+      [
+        ...Acc,
+        ...(Head extends WorkflowBuilder<any, any, any, infer S, any> ? S : []),
+      ]
+    >
+  : Acc;
+
 /* ------------------------------------------------ */
 /* FLUENT WORKFLOW BUILDER                          */
 /* ------------------------------------------------ */
@@ -176,9 +204,11 @@ export class WorkflowBuilder<
     Input,
     Context,
     [...Steps, StepDef<Reg, ID, ActionName>],
-    Results & {
-      [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut>;
-    }
+    Simplify<
+      Results & {
+        [K in ID]: StepResultFromResolve<Reg, ActionName, ResolveOut>;
+      }
+    >
   > {
     const deps = dependsOn ?? [...this.frontier];
 
@@ -235,7 +265,7 @@ export class WorkflowBuilder<
     // Override the result of the last step only
     Steps extends [...infer Rest, infer Last]
       ? Last extends StepDef<Reg, infer ID, any>
-        ? Omit<Results, ID> & { [K in ID]: NewType }
+        ? Simplify<Omit<Results, ID> & { [K in ID]: NewType }>
         : Results
       : Results,
     Output
@@ -243,9 +273,6 @@ export class WorkflowBuilder<
     return this as any;
   }
 
-  /* ------------------------------------------------ */
-  /* Parallel branches                               */
-  /* ------------------------------------------------ */
   // parallel<Branches extends WorkflowBuilder<Reg, Input, Context, any, any>[]>(
   //   ...branches: {
   //     [K in keyof Branches]: (
@@ -262,10 +289,22 @@ export class WorkflowBuilder<
   //       ? S
   //       : never),
   //   ],
-  //   Results &
-  //     (Branches[number] extends WorkflowBuilder<Reg, any, any, any, infer R>
-  //       ? UnionToIntersection<R>
-  //       : {})
+  //   Simplify<
+  //     Results &
+  //       UnionToIntersection<
+  //         {
+  //           [K in keyof Branches]: Branches[K] extends WorkflowBuilder<
+  //             Reg,
+  //             any,
+  //             any,
+  //             any,
+  //             infer R
+  //           >
+  //             ? R
+  //             : never;
+  //         }[number]
+  //       >
+  //   >
   // > {
   //   const parentFrontier = [...this.frontier];
   //   const branchEnds: string[] = [];
@@ -288,7 +327,9 @@ export class WorkflowBuilder<
   //   return this as any;
   // }
 
-  parallel<Branches extends WorkflowBuilder<Reg, Input, Context, any, any>[]>(
+  parallel<
+    Branches extends readonly WorkflowBuilder<Reg, Input, Context, any, any>[],
+  >(
     ...branches: {
       [K in keyof Branches]: (
         builder: WorkflowBuilder<Reg, Input, Context, [], Results>,
@@ -298,26 +339,14 @@ export class WorkflowBuilder<
     Reg,
     Input,
     Context,
-    [
-      ...Steps,
-      ...(Branches[number] extends WorkflowBuilder<Reg, any, any, infer S, any>
-        ? S
-        : never),
-    ],
-    Results &
-      UnionToIntersection<
-        {
-          [K in keyof Branches]: Branches[K] extends WorkflowBuilder<
-            Reg,
-            any,
-            any,
-            any,
-            infer R
-          >
-            ? R
-            : never;
-        }[number]
-      >
+    MergeBranchSteps<Branches, Steps>,
+    // [
+    //   ...Steps,
+    //   ...(Branches[number] extends WorkflowBuilder<Reg, any, any, infer S, any>
+    //     ? S
+    //     : never),
+    // ],
+    Simplify<MergeBranchResults<Branches, Results>>
   > {
     const parentFrontier = [...this.frontier];
     const branchEnds: string[] = [];
