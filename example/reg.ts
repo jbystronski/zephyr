@@ -45,8 +45,6 @@ export const opsRegistry = createActionRegistry()
 opsRegistry.multiply({ m: 4, base: 10 });
 opsRegistry.logger({ toLog: "VALUE" });
 
-const wf = createWorkflow(opsRegistry);
-
 export const subReg = createActionRegistry()
   .action("toUp", uppercase)
   .action("lowercase", lc)

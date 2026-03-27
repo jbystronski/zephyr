@@ -67,6 +67,7 @@ export async function executeWorkflow<
   workflow: WorkflowDef<Reg, I, R, Steps, O>,
   registry: Reg,
   input: I,
+  context: any,
   observers: WorkflowObserver<Reg>[] = [],
 ): Promise<{ results: R; output: O; extras: Record<string, any> }> {
   const results: Record<string, any> = {};
@@ -140,7 +141,6 @@ export async function executeWorkflow<
         };
         extras.frames[stepId] = frame;
 
-        const context = (workflow as any).__context;
         const ctx = {
           stepId,
           input,

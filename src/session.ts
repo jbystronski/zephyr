@@ -8,58 +8,33 @@ type ModuleFlows<Reg extends ActionRegistry> = Record<
   WorkflowDef<Reg, any, any>
 >;
 
-export class WorkflowSession<
-  Reg extends ActionRegistry,
-  State extends Record<string, any>,
-> {
-  private subscribers = new Set<(state: Partial<State>) => void>();
+export class WorkflowSession<Reg extends ActionRegistry, Ctx> {
+  private subscribers = new Set<(state: Partial<Ctx>) => void>();
   private running = false;
-  private queue: Array<{ key: keyof ModuleFlows<Reg>; input: any }> = [];
-  public state: State; // session state & workflow context are the same object
+  private queue: Array<{ workflow: any; input: any }> = [];
+  // public state: State; // session state & workflow context are the same object
   public observers: WorkflowObserver[] = [];
-  private moduleFlows: ModuleFlows<Reg>;
 
-  /**
-   * @param baseModule Module to extend (inherits workflows)
-   * @param registry Action registry
-   * @param initialContext Initial context (session state) — will be mutated in workflows
-   */
   constructor(
-    baseModule: ModuleFlows<Reg>,
-    private registry: Reg,
-    initialContext: State,
-    observers: WorkflowObserver[],
-  ) {
-    // Use the same object for session state and module context
-    this.state = initialContext;
-    this.observers = observers;
+    public runtime: {
+      run: any;
+      getContext: () => Ctx;
+    },
+  ) {}
 
-    // Per-session module: inherits workflows, shares the same state/context object
-    this.moduleFlows = createModule({
-      registry: this.registry,
-      context: this.state,
-      use: [baseModule],
-      define: () => ({}), // no new flows needed
-    });
-  }
-
-  getState() {
-    return this.state;
-  }
-
-  subscribe(fn: (state: Partial<State>) => void) {
+  subscribe(fn: (state: Partial<Ctx>) => void) {
     this.subscribers.add(fn);
-    fn(this.state); // immediately notify
+    fn(this.runtime.getContext()); // immediately notify
     return () => this.subscribers.delete(fn);
   }
 
   private notify() {
-    for (const fn of this.subscribers) fn(this.state);
+    for (const fn of this.subscribers) fn(this.runtime.getContext());
   }
 
   /** Queue a workflow execution by key and input; state/context is automatically updated */
-  dispatch(key: keyof ModuleFlows<Reg>, input: any = {}) {
-    this.queue.push({ key, input });
+  dispatch(workflow: any, input: any) {
+    this.queue.push({ workflow, input });
     if (!this.running) this.processQueue();
   }
 
@@ -67,15 +42,9 @@ export class WorkflowSession<
     this.running = true;
 
     while (this.queue.length) {
-      const { key, input } = this.queue.shift()!;
-      const workflow = this.moduleFlows[key];
+      const { workflow, input } = this.queue.shift()!;
+      await this.runtime.run(workflow, input);
 
-      if (!workflow) throw new Error(`Workflow ${String(key)} not found`);
-
-      // state/context already lives on the module; no need to pass a separate context
-      await executeWorkflow(workflow, this.registry, input, this.observers);
-
-      // Notify subscribers after workflow mutates state
       this.notify();
     }
 

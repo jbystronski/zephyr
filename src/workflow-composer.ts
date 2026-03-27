@@ -99,7 +99,7 @@ export type WorkflowDef<
   input: Input;
   results: Results;
   outputResolver?: (ctx: any) => Output;
-  __context?: any;
+  // __context?: any;
 };
 type StepRuntimeCtx<I, R, C> = {
   input: I;
@@ -123,12 +123,6 @@ type StepOptions<Input, Results, Context> = {
 /* ------------------------------------------------ */
 /* HELPER TYPES                                    */
 /* ------------------------------------------------ */
-
-type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
-  k: infer I,
-) => void
-  ? I
-  : never;
 
 type MergeBranchResults<
   Branches extends readonly any[],
@@ -160,7 +154,7 @@ type MergeBranchSteps<
 export class WorkflowBuilder<
   Reg extends ActionRegistry,
   Input = unknown,
-  Context extends Record<string, any> = {},
+  Context = unknown,
   Steps extends StepDef<Reg, any, any>[] = [],
   Results = {},
   Output = undefined,
@@ -177,11 +171,7 @@ export class WorkflowBuilder<
     this.pendingWhen = undefined;
   }
 
-  constructor(
-    private name: string,
-    private registry: Reg,
-    private context: Context,
-  ) {}
+  constructor(private name: string) {}
 
   step<
     ID extends string,
@@ -273,60 +263,6 @@ export class WorkflowBuilder<
     return this as any;
   }
 
-  // parallel<Branches extends WorkflowBuilder<Reg, Input, Context, any, any>[]>(
-  //   ...branches: {
-  //     [K in keyof Branches]: (
-  //       builder: WorkflowBuilder<Reg, Input, Context, [], Results>,
-  //     ) => Branches[K];
-  //   }
-  // ): WorkflowBuilder<
-  //   Reg,
-  //   Input,
-  //   Context,
-  //   [
-  //     ...Steps,
-  //     ...(Branches[number] extends WorkflowBuilder<Reg, any, any, infer S, any>
-  //       ? S
-  //       : never),
-  //   ],
-  //   Simplify<
-  //     Results &
-  //       UnionToIntersection<
-  //         {
-  //           [K in keyof Branches]: Branches[K] extends WorkflowBuilder<
-  //             Reg,
-  //             any,
-  //             any,
-  //             any,
-  //             infer R
-  //           >
-  //             ? R
-  //             : never;
-  //         }[number]
-  //       >
-  //   >
-  // > {
-  //   const parentFrontier = [...this.frontier];
-  //   const branchEnds: string[] = [];
-  //
-  //   branches.forEach((branch) => {
-  //     const b = new WorkflowBuilder<Reg, Input, Context, [], Results>(
-  //       this.name,
-  //       this.registry,
-  //       this.context,
-  //     );
-  //
-  //     b.frontier = parentFrontier;
-  //     branch(b);
-  //     branchEnds.push(...b.frontier);
-  //     this.steps.push(...(b as any).steps);
-  //   });
-  //
-  //   this.frontier = branchEnds;
-  //   this.clearPendingWhen();
-  //   return this as any;
-  // }
-
   parallel<
     Branches extends readonly WorkflowBuilder<Reg, Input, Context, any, any>[],
   >(
@@ -354,8 +290,6 @@ export class WorkflowBuilder<
     branches.forEach((branch) => {
       const b = new WorkflowBuilder<Reg, Input, Context, [], Results>(
         this.name,
-        this.registry,
-        this.context,
       );
 
       b.frontier = parentFrontier;
@@ -508,7 +442,6 @@ export class WorkflowBuilder<
       input: {} as Input,
       results: {} as Results,
       outputResolver: this.outputResolver,
-      __context: this.context,
     };
   }
 
@@ -534,15 +467,20 @@ export class WorkflowBuilder<
 /* ------------------------------------------------ */
 /* WORKFLOW CREATOR                                 */
 /* ------------------------------------------------ */
+// export function createWorkflow<
+//   Reg extends ActionRegistry,
+//   Context extends Record<string, any> = {},
+// >(registry: Reg, context?: Context) {
+//   return function workflow<Input = unknown>(name: string) {
+//     return new WorkflowBuilder<Reg, Input, Context>(name);
+//   };
+// }
+
 export function createWorkflow<
   Reg extends ActionRegistry,
   Context extends Record<string, any> = {},
->(registry: Reg, context?: Context) {
+>() {
   return function workflow<Input = unknown>(name: string) {
-    return new WorkflowBuilder<Reg, Input, Context>(
-      name,
-      registry,
-      context || ({} as Context),
-    );
+    return new WorkflowBuilder<Reg, Input, Context>(name);
   };
 }
