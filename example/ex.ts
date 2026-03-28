@@ -1,7 +1,7 @@
 import { createActionRegistry, useLog } from "../src/index.js";
 
 import { executeWorkflow } from "../src/workflow-executor.js";
-import { createModule, createModuleFactory } from "../src/workflow-module.js";
+import { createModuleFactory } from "../src/workflow-module.js";
 import { opsRegistry, subReg, uppercase } from "./reg";
 
 // type BaseCtx = {
