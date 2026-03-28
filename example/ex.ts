@@ -1,4 +1,4 @@
-import { createActionRegistry, createRuntime, useLog } from "../src/index.js";
+import { createActionRegistry, useLog } from "../src/index.js";
 
 import { executeWorkflow } from "../src/workflow-executor.js";
 import { createModule, createModuleFactory } from "../src/workflow-module.js";
@@ -161,7 +161,7 @@ export const regOne = {
 //   }),
 // });
 //
-const machineReg = createActionRegistry()
+const machineReg = createActionRegistry("machine_")
   .action("get_terrain", (context: MachineCtx) => {
     return context.terrain;
   })
@@ -186,7 +186,7 @@ const createMotorboatMod = createModuleFactory<
 const machineMod = createMachineMod({
   define: ({ wf }) => {
     const getTerrain = wf("getTerrain")
-      .seq("getTerrain", "get_terrain", (ctx) => ctx.args(ctx.context))
+      .seq("getTerrain", "machine_get_terrain", (ctx) => ctx.args(ctx.context))
       .output((ctx) => ctx.results.getTerrain);
 
     return {
