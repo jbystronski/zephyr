@@ -150,6 +150,32 @@ import { ActionRegistry, Simplify, WorkflowObserver } from "./types.js";
 import { createWorkflow, WorkflowDef } from "./workflow-composer.js";
 import { executeWorkflow } from "./workflow-executor.js";
 
+type ModuleWFRegistry<
+  Own extends ModuleShape,
+  Deps extends ModuleMap,
+> = OwnWFs<Own> & DepsWFs<Deps>;
+
+type OwnWFs<Own extends ModuleShape> = { [K in keyof Own & string]: Own[K] };
+
+// type DepsWFs<Deps extends ModuleMap> = {
+//   [DepName in keyof Deps & string as DepName extends string
+//     ? `${DepName}.${keyof Deps[DepName]["own"] & string}`
+//     : never]: Deps[DepName] extends Module<any, any, infer Own, any>
+//     ? Own[keyof Own & string]
+//     : never;
+// };
+
+type NamespacedDepWFs<
+  DepName extends string,
+  M extends Module<any, any, any, any>,
+> = {
+  [K in keyof M["own"] & string as `${DepName}.${K}`]: M["own"][K];
+};
+
+type DepsWFs<Deps extends ModuleMap> = {
+  [DepName in keyof Deps & string]: NamespacedDepWFs<DepName, Deps[DepName]>;
+}[keyof Deps & string]; // flatten to single object
+
 type ModuleDepsPublic<Use> = {
   [K in keyof Use]: Use[K] extends Module<any, infer Ctx, infer Own, any>
     ? ModulePublic<Ctx, Own>
@@ -196,11 +222,11 @@ export type WorkflowResults<W> =
 export type WorkflowOutput<W> =
   W extends WorkflowDef<any, any, any, any, infer O> ? O : never;
 
-type WorkflowFromDeps<Deps> = {
-  [K in keyof Deps]: Deps[K] extends Module<any, any, infer Own, any>
-    ? Own[keyof Own]
-    : never;
-}[keyof Deps];
+// type WorkflowFromDeps<Deps> = {
+//   [K in keyof Deps]: Deps[K] extends Module<any, any, infer Own, any>
+//     ? Own[keyof Own]
+//     : never;
+// }[keyof Deps];
 
 type Module<
   Reg extends ActionRegistry,
@@ -215,13 +241,13 @@ type Module<
     registry: Reg;
     context: FinalContext<Reg, Context, Deps>;
   }) => {
-    run: <W extends Own[keyof Own] | WorkflowFromDeps<Deps>>(
-      workflow: W,
-      input: WorkflowInput<W>,
+    run: <K extends keyof ModuleWFRegistry<Own, Deps>>(
+      workflow: K,
+      input: WorkflowInput<ModuleWFRegistry<Own, Deps>[K]>,
       observers?: WorkflowObserver<Reg>[],
     ) => Promise<{
-      results: WorkflowResults<W>;
-      output: WorkflowOutput<W>;
+      results: WorkflowResults<ModuleWFRegistry<Own, Deps>[K]>;
+      output: WorkflowOutput<ModuleWFRegistry<Own, Deps>[K]>;
       extras: Record<string, any>;
     }>;
 
@@ -250,6 +276,7 @@ export type ModuleContext<
 function toPublicDeps<Use extends ModuleMap>(deps: Use): ModuleDepsPublic<Use> {
   return deps as unknown as ModuleDepsPublic<Use>;
 }
+
 function createModule<
   Reg extends ActionRegistry,
   Context extends Record<string, any>,
@@ -259,34 +286,43 @@ function createModule<
   use?: Use;
   define: (ctx: ModuleContext<Reg, Context, Use>) => Own;
 }): Module<Reg, Context, Own, Use> {
-  const wf = createWorkflow<Reg, Context>();
-
   const deps = (config.use ?? {}) as Use;
-
-  const moduleCtx: ModuleContext<Reg, Context, Use> = {
-    wf,
+  const own = config.define({
+    wf: createWorkflow<Reg, Context>(),
     deps,
     context: {} as Context,
-
     tools: (factory) =>
       factory({
-        wf,
+        wf: createWorkflow<Reg, Context>(),
         deps,
         context: {} as Context,
       }),
-  };
+  });
 
-  const own = config.define(moduleCtx);
+  function mergeWFs(): ModuleWFRegistry<Own, Use> {
+    const depWFs = Object.fromEntries(
+      Object.entries(deps).flatMap(([depName, depModule]) =>
+        Object.entries(depModule.own).map(([k, wf]) => [`${depName}.${k}`, wf]),
+      ),
+    );
+    return { ...own, ...depWFs } as ModuleWFRegistry<Own, Use>;
+  }
+
   return {
     own,
     deps: toPublicDeps(deps),
     createRuntime({ registry, context }) {
-      const runtimeCtx = { ...context } as FinalContext<Reg, Context, Use>;
+      const workflowRegistry = mergeWFs();
       return {
-        run: async (workflow, input, observers = []) => {
-          return executeWorkflow(workflow, registry, input, context, observers);
+        run: async <K extends keyof ModuleWFRegistry<Own, Use>>(
+          workflowId: K,
+          input: WorkflowInput<ModuleWFRegistry<Own, Use>[K]>,
+          observers: WorkflowObserver<Reg>[] = [],
+        ) => {
+          const wfObj = workflowRegistry[workflowId]; // <-- concrete WorkflowDef
+          return executeWorkflow(wfObj, registry, input, context, observers);
         },
-        getContext: () => ({ ...runtimeCtx }),
+        getContext: () => ({ ...context }) as FinalContext<Reg, Context, Use>,
       };
     },
   };
