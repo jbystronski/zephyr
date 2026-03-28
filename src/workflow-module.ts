@@ -85,7 +85,7 @@ export type ModuleContext<
   ) => T;
 };
 
-export function createModule<
+function createModule<
   Reg extends ActionRegistry,
   Context extends Record<string, any>,
   Use extends ModuleMap<Reg>,

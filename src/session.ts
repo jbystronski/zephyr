@@ -1,7 +1,6 @@
 import { ActionRegistry, WorkflowObserver } from "./types.js";
 import { WorkflowDef } from "./workflow-composer.js";
 import { executeWorkflow } from "./workflow-executor.js";
-import { createModule } from "./workflow-module.js";
 
 type ModuleFlows<Reg extends ActionRegistry> = Record<
   string,
