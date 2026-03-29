@@ -48,6 +48,12 @@ const helicopterReg = createActionRegistry("helicopter_")
   })
   .build();
 
+const baloonReg = createActionRegistry("baloon_")
+  .action("fly_away", () => {
+    console.log("flying aways");
+  })
+  .build();
+
 type MachineCtx = { terrain: string; type: string; singleton: () => boolean };
 type AirplaneCtx = { maxAltitude: number; terrain: string; type: string };
 
@@ -80,6 +86,15 @@ const machineMod = createMachineMod({
       getTerrain,
       logValue,
     };
+  },
+});
+
+const baloonMod = createModuleFactory<typeof baloonReg, {}>()({
+  define: ({ wf }) => {
+    const flywAway = wf("fly_away")
+      .seq("fa", "baloon_fly_away", (ctx) => ctx.none())
+      .output((ctx) => ({ msg: "flew away" }));
+    return { flywAway };
   },
 });
 
@@ -119,7 +134,7 @@ const helicopterMod = createModuleFactory<
   typeof helicopterReg,
   helicopterCtx
 >()({
-  use: { airplane: airplaneMod },
+  use: { airplane: airplaneMod, baloon: baloonMod },
   define: ({ wf }) => {
     const getRoot = wf("getRoot")
       .subflow("getRoot", "airplane.log", (ctx) => ({ input: "xxx" }))

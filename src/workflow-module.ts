@@ -371,18 +371,39 @@
 import { ActionRegistry, WorkflowObserver } from "./types.js";
 import { createWorkflow, WorkflowDef } from "./workflow-composer.js";
 import { executeWorkflow } from "./workflow-executor.js";
-
+type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
+  x: infer I,
+) => any
+  ? I
+  : never;
 /* ------------------------------------------------ */
 /* WORKFLOW REGISTRY TYPES                          */
 /* ------------------------------------------------ */
+// type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
+//   ? {}
+//   : {
+//       [D in keyof Deps & string]: {
+//         [K in keyof Deps[D]["workflows"] &
+//           string as `${D}.${K}`]: Deps[D]["workflows"][K];
+//       };
+//     }[keyof Deps & string];
+type EnsureWorkflowRecord<T> =
+  T extends Record<string, WorkflowDef<any, any, any, any, any>>
+    ? T
+    : Record<string, WorkflowDef<any, any, any, any, any>>;
+
 type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
   ? {}
-  : {
-      [D in keyof Deps & string]: {
-        [K in keyof Deps[D]["workflows"] &
-          string as `${D}.${K}`]: Deps[D]["workflows"][K];
-      };
-    }[keyof Deps & string];
+  : EnsureWorkflowRecord<
+      UnionToIntersection<
+        {
+          [D in keyof Deps & string]: {
+            [K in keyof Deps[D]["workflows"] &
+              string as `${D}.${K}`]: Deps[D]["workflows"][K];
+          };
+        }[keyof Deps & string]
+      >
+    >;
 
 type WorkflowRegistry<Own extends ModuleShape, Deps extends ModuleMap> = Own &
   DepWorkflows<Deps>;
@@ -477,9 +498,7 @@ function createModule<
   Own extends ModuleShape,
 >(config: {
   use?: Use;
-  define: (
-    ctx: ModuleContext<Reg, DepWorkflows<Use>, Context>, // ✅ FIXED HERE
-  ) => Own;
+  define: (ctx: ModuleContext<Reg, DepWorkflows<Use>, Context>) => Own;
 }): Module<Reg, Context, Own, Use> {
   const deps = (config.use ?? {}) as Use;
 
