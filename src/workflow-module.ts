@@ -172,9 +172,18 @@ type NamespacedDepWFs<
   [K in keyof M["own"] & string as `${DepName}.${K}`]: M["own"][K];
 };
 
-type DepsWFs<Deps extends ModuleMap> = {
-  [DepName in keyof Deps & string]: NamespacedDepWFs<DepName, Deps[DepName]>;
-}[keyof Deps & string]; // flatten to single object
+// type DepsWFs<Deps extends ModuleMap> = {
+//   [DepName in keyof Deps & string]: NamespacedDepWFs<DepName, Deps[DepName]>;
+// }[keyof Deps & string];
+
+type DepsWFs<Deps extends ModuleMap> = [keyof Deps] extends [never]
+  ? {}
+  : {
+      [DepName in keyof Deps & string]: NamespacedDepWFs<
+        DepName,
+        Deps[DepName]
+      >;
+    }[keyof Deps & string];
 
 type ModuleDepsPublic<Use> = {
   [K in keyof Use]: Use[K] extends Module<any, infer Ctx, infer Own, any>
