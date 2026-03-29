@@ -607,7 +607,6 @@ export type WorkflowDef<
   input: Input;
   results: Results;
   outputResolver?: (ctx: any) => Output;
-  // __context?: any;
 };
 type StepRuntimeCtx<I, R, C> = {
   input: I;
@@ -680,6 +679,14 @@ type MergeBranchResults<
 /* ------------------------------------------------ */
 /* FLUENT WORKFLOW BUILDER                          */
 /* ------------------------------------------------ */
+type WorkflowBuilderStatic<
+  Reg extends ActionRegistry,
+  Input,
+  Context,
+  Steps extends StepDef<Reg, any, any>[] = [],
+  Results = {},
+  Output = undefined,
+> = WorkflowBuilder<Reg, Input, Context, Steps, Results, Output>;
 
 export class WorkflowBuilder<
   Reg extends ActionRegistry,
@@ -690,6 +697,7 @@ export class WorkflowBuilder<
   Output = undefined,
 > {
   private steps: StepDef<Reg, any, any>[] = [];
+
   private frontier: string[] = [];
   private pendingWhen?: (ctx: {
     input: Input;
@@ -794,11 +802,17 @@ export class WorkflowBuilder<
   }
 
   parallel<
-    Branches extends readonly WorkflowBuilder<Reg, Input, Context, any, any>[],
+    Branches extends readonly WorkflowBuilderStatic<
+      Reg,
+      Input,
+      Context,
+      any,
+      any
+    >[],
   >(
     ...branches: {
       [K in keyof Branches]: (
-        builder: WorkflowBuilder<Reg, Input, Context, [], Results>,
+        builder: WorkflowBuilderStatic<Reg, Input, Context, [], Results>,
       ) => Branches[K];
     }
   ): WorkflowBuilder<

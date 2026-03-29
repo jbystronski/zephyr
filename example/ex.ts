@@ -280,6 +280,7 @@ const helicopterMod = createModuleFactory<
       )
       .seq("some", "machine_action_b1", (ctx) => ctx.args("vsp"))
       .seq("start", "helicopter_offGround")
+      .subflow("sub", deps.airplane.deps.machine.own.getTerrain, (ctx) => ({}))
       .parallel(
         (b0) => b0.subflow("b0", deps.airplane.own.getTerrain, (ctx) => ({})),
         (b1) =>
@@ -289,9 +290,7 @@ const helicopterMod = createModuleFactory<
         (b2) =>
           b2
             .seq("x", "machine_get_terrain", (ctx) => ctx.none())
-            .seq("y", "machine_action_b2", (ctx) =>
-              ctx.args(ctx.input.cargo[0]),
-            ),
+            .seq("y", "machine_action_b2", (ctx) => ctx.args(ctx.results.sub)),
       )
       .join("join", "machine_noop", (ctx) => {
         console.log(ctx.results);
