@@ -43,7 +43,7 @@ export type WorkflowObserver<Reg extends ActionRegistry = any> = {
       stepId: string;
       input: any;
       results: Record<string, any>;
-      registry: Reg;
+      actionRegistry: Reg;
       extras: Record<string, any>;
       frame: ExecutionFrame;
     },

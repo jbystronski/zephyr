@@ -551,18 +551,18 @@ type CallHelpers<Reg extends ActionRegistry, ActionName extends keyof Reg> = {
 /* STEP RESULT TYPES                               */
 /* ------------------------------------------------ */
 
-type SubflowResult<SubResults, SubOutput> = SubOutput extends undefined
-  ? SubResults
-  : SubOutput;
-
 type WorkflowInput<T> =
   T extends WorkflowDef<any, infer I, any, any, any> ? I : never;
 
-type WorkflowResults<T> =
-  T extends WorkflowDef<any, any, infer R, any, any> ? R : never;
+// type WorkflowOutput<T> =
+//   T extends WorkflowDef<any, any, any, any, infer O> ? O : never;
 
 type WorkflowOutput<T> =
-  T extends WorkflowDef<any, any, any, any, infer O> ? O : never;
+  T extends WorkflowDef<any, any, any, any, infer O>
+    ? unknown extends O
+      ? undefined
+      : O
+    : undefined;
 
 export type StepResultFromResolve<
   Reg extends ActionRegistry,
@@ -587,6 +587,7 @@ export type StepDef<
   resolve: (ctx: any) => ResolvedStepInput;
   when?: (ctx: any) => boolean;
   options?: StepOptions<any, any, any>;
+  __subflowId?: string;
 };
 
 /* ------------------------------------------------ */
@@ -638,7 +639,10 @@ type MergeBranchResults<
 > = Branches extends readonly [infer Head, ...infer Tail]
   ? MergeBranchResults<
       Tail,
-      Acc & (Head extends WorkflowBuilder<any, any, any, any, infer R> ? R : {})
+      Acc &
+        (Head extends WorkflowBuilder<any, any, any, any, any, infer R>
+          ? R
+          : {})
     >
   : Acc;
 
@@ -650,7 +654,9 @@ type MergeBranchSteps<
       Tail,
       [
         ...Acc,
-        ...(Head extends WorkflowBuilder<any, any, any, infer S, any> ? S : []),
+        ...(Head extends WorkflowBuilder<any, any, any, any, infer S, any>
+          ? S
+          : []),
       ]
     >
   : Acc;
@@ -661,6 +667,7 @@ type MergeBranchSteps<
 
 export class WorkflowBuilder<
   Reg extends ActionRegistry,
+  WFReg extends Record<string, WorkflowDef<any, any, any, any, any>>, //
   Input = unknown,
   Context = unknown,
   Steps extends StepDef<Reg, any, any>[] = [],
@@ -699,6 +706,7 @@ export class WorkflowBuilder<
     options?: StepOptions<Input, Results, Context>,
   ): WorkflowBuilder<
     Reg,
+    WFReg,
     Input,
     Context,
     [...Steps, StepDef<Reg, ID, ActionName>],
@@ -757,6 +765,7 @@ export class WorkflowBuilder<
   /* ------------------------------------------------ */
   as<NewType>(): WorkflowBuilder<
     Reg,
+    WFReg,
     Input,
     Context,
     Steps,
@@ -772,15 +781,23 @@ export class WorkflowBuilder<
   }
 
   parallel<
-    Branches extends readonly WorkflowBuilder<Reg, Input, Context, any, any>[],
+    Branches extends readonly WorkflowBuilder<
+      Reg,
+      WFReg,
+      Input,
+      Context,
+      any,
+      any
+    >[],
   >(
     ...branches: {
       [K in keyof Branches]: (
-        builder: WorkflowBuilder<Reg, Input, Context, [], Results>,
+        builder: WorkflowBuilder<Reg, WFReg, Input, Context, [], Results>,
       ) => Branches[K];
     }
   ): WorkflowBuilder<
     Reg,
+    WFReg,
     Input,
     Context,
     MergeBranchSteps<Branches, Steps>,
@@ -796,7 +813,7 @@ export class WorkflowBuilder<
     const branchEnds: string[] = [];
 
     branches.forEach((branch) => {
-      const b = new WorkflowBuilder<Reg, Input, Context, [], Results>(
+      const b = new WorkflowBuilder<Reg, WFReg, Input, Context, [], Results>(
         this.name,
       );
 
@@ -842,69 +859,38 @@ export class WorkflowBuilder<
     return result;
   }
 
-  /* ------------------------------------------------ */
-  /* Subflow                                         */
-  /* ------------------------------------------------ */
-
-  subflow<
-    Prefix extends string,
-    SubSteps extends StepDef<Reg, any, any>[],
-    WF extends WorkflowDef<Reg, any, any, SubSteps, any>,
-  >(
+  subflow<Prefix extends string, K extends keyof WFReg & string>(
     prefix: Prefix,
-    workflow: WF,
-    resolveInput: WorkflowInput<WF> extends undefined
-      ?
-          | ((ctx: {
-              input: Input;
-              results: Results;
-              context: Context;
-            }) => WorkflowInput<WF>)
-          | undefined
-      : (ctx: {
-          input: Input;
-          results: Results;
-          context: Context;
-        }) => WorkflowInput<WF>,
+    workflowKey: K,
+    resolveInput: (ctx: {
+      input: Input;
+      results: Results;
+      context: Context;
+    }) => WorkflowInput<WFReg[K]>,
     options?: StepOptions<Input, Results, Context>,
   ): WorkflowBuilder<
     Reg,
+    WFReg,
     Input,
     Context,
     Steps,
-    Results & {
-      [K in Prefix]: SubflowResult<WorkflowResults<WF>, WorkflowOutput<WF>>;
-    }
+    Results & { [P in Prefix]: WorkflowOutput<WFReg[K]> }
   > {
-    const idMap = new Map<string, string>();
+    this.steps.push({
+      id: prefix,
+      action: "__subflow__",
+      dependsOn: [...this.frontier],
 
-    workflow.steps.forEach((step) => {
-      idMap.set(step.id, `${prefix}.${step.id}`);
+      resolve: (ctx: any) => ({
+        kind: "object",
+        args: resolveInput(ctx),
+      }),
+
+      options,
+      __subflowId: workflowKey, // 👈 STRING ONLY
     });
 
-    workflow.steps.forEach((step) => {
-      const newStep: StepDef<Reg, any, any> = {
-        ...step,
-        id: idMap.get(step.id)!,
-        dependsOn: step.dependsOn.map((d) => idMap.get(d)!),
-        resolve: (ctx: any) => {
-          const subInput = resolveInput ? resolveInput(ctx) : undefined;
-          return step.resolve({
-            input: subInput,
-            results: ctx.results,
-            context: ctx.context,
-          });
-        },
-      };
-
-      if (workflow.entrySteps.find((e) => e.id === step.id)) {
-        newStep.dependsOn = [...this.frontier];
-      }
-
-      this.steps.push(newStep);
-    });
-
-    this.frontier = workflow.endSteps.map((e) => idMap.get(e.id)!);
+    this.frontier = [prefix];
     return this as any;
   }
 
@@ -918,7 +904,7 @@ export class WorkflowBuilder<
       results: Results;
       context: Context;
     }) => boolean,
-  ): WorkflowBuilder<Reg, Input, Context, Steps, Results, Output> {
+  ): WorkflowBuilder<Reg, WFReg, Input, Context, Steps, Results, Output> {
     this.pendingWhen = predicate;
     return this;
   }
@@ -986,9 +972,10 @@ export class WorkflowBuilder<
 
 export function createWorkflow<
   Reg extends ActionRegistry,
+  WFReg extends Record<string, WorkflowDef<any, any, any, any, any>>, // 👈 NEW
   Context extends Record<string, any> = {},
 >() {
   return function workflow<Input = unknown>(name: string) {
-    return new WorkflowBuilder<Reg, Input, Context>(name);
+    return new WorkflowBuilder<Reg, WFReg, Input, Context>(name);
   };
 }
