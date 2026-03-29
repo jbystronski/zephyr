@@ -607,6 +607,7 @@ export type WorkflowDef<
   input: Input;
   results: Results;
   outputResolver?: (ctx: any) => Output;
+  // __context?: any;
 };
 type StepRuntimeCtx<I, R, C> = {
   input: I;
@@ -631,6 +632,16 @@ type StepOptions<Input, Results, Context> = {
 /* HELPER TYPES                                    */
 /* ------------------------------------------------ */
 
+type MergeBranchResults<
+  Branches extends readonly any[],
+  Acc,
+> = Branches extends readonly [infer Head, ...infer Tail]
+  ? MergeBranchResults<
+      Tail,
+      Acc & (Head extends WorkflowBuilder<any, any, any, any, infer R> ? R : {})
+    >
+  : Acc;
+
 type MergeBranchSteps<
   Branches extends readonly any[],
   Acc extends any[],
@@ -644,49 +655,9 @@ type MergeBranchSteps<
     >
   : Acc;
 
-type MergeParallelBranches<
-  ParentResults,
-  Branches extends readonly WorkflowBuilder<any, any, any, any, any>[],
-> = ParentResults &
-  {
-    [B in keyof Branches]: Branches[B] extends WorkflowBuilder<
-      any,
-      any,
-      any,
-      any,
-      infer R
-    >
-      ? R
-      : never;
-  }[number];
-
-type ExtractBranchResults<
-  Branch extends WorkflowBuilder<any, any, any, any, any>,
-> = Branch extends WorkflowBuilder<any, any, any, any, infer R> ? R : never;
-
-type MergeBranchResults<
-  Branches extends readonly WorkflowBuilder<any, any, any, any, any>[],
-> = Simplify<
-  Branches extends readonly [infer Head, ...infer Tail]
-    ? Head extends WorkflowBuilder<any, any, any, any, infer R>
-      ? Tail extends readonly WorkflowBuilder<any, any, any, any, any>[]
-        ? R & MergeBranchResults<Tail>
-        : R
-      : MergeBranchResults<Tail & WorkflowBuilder<any, any, any, any, any>[]>
-    : {}
->;
-
 /* ------------------------------------------------ */
 /* FLUENT WORKFLOW BUILDER                          */
 /* ------------------------------------------------ */
-type WorkflowBuilderStatic<
-  Reg extends ActionRegistry,
-  Input,
-  Context,
-  Steps extends StepDef<Reg, any, any>[] = [],
-  Results = {},
-  Output = undefined,
-> = WorkflowBuilder<Reg, Input, Context, Steps, Results, Output>;
 
 export class WorkflowBuilder<
   Reg extends ActionRegistry,
@@ -697,7 +668,6 @@ export class WorkflowBuilder<
   Output = undefined,
 > {
   private steps: StepDef<Reg, any, any>[] = [];
-
   private frontier: string[] = [];
   private pendingWhen?: (ctx: {
     input: Input;
@@ -802,17 +772,11 @@ export class WorkflowBuilder<
   }
 
   parallel<
-    Branches extends readonly WorkflowBuilderStatic<
-      Reg,
-      Input,
-      Context,
-      any,
-      any
-    >[],
+    Branches extends readonly WorkflowBuilder<Reg, Input, Context, any, any>[],
   >(
     ...branches: {
       [K in keyof Branches]: (
-        builder: WorkflowBuilderStatic<Reg, Input, Context, [], Results>,
+        builder: WorkflowBuilder<Reg, Input, Context, [], Results>,
       ) => Branches[K];
     }
   ): WorkflowBuilder<
@@ -820,7 +784,13 @@ export class WorkflowBuilder<
     Input,
     Context,
     MergeBranchSteps<Branches, Steps>,
-    Results & MergeBranchResults<Branches>
+    // [
+    //   ...Steps,
+    //   ...(Branches[number] extends WorkflowBuilder<Reg, any, any, infer S, any>
+    //     ? S
+    //     : never),
+    // ],
+    Simplify<MergeBranchResults<Branches, Results>>
   > {
     const parentFrontier = [...this.frontier];
     const branchEnds: string[] = [];
@@ -829,6 +799,7 @@ export class WorkflowBuilder<
       const b = new WorkflowBuilder<Reg, Input, Context, [], Results>(
         this.name,
       );
+
       b.frontier = parentFrontier;
       branch(b);
       branchEnds.push(...b.frontier);
@@ -837,45 +808,34 @@ export class WorkflowBuilder<
 
     this.frontier = branchEnds;
     this.clearPendingWhen();
-
-    // TypeScript now knows the returned WorkflowBuilder's Results = parent & branch results
     return this as any;
   }
 
   /* ------------------------------------------------ */
   /* Join helper                                     */
   /* ------------------------------------------------ */
-
   join<
     ID extends string = string,
     ActionName extends keyof Reg & string = any,
     ResolveOut extends ResolvedStepInput = ResolvedStepInput,
-    BranchResults = {},
   >(
     id: ID,
     action: ActionName,
     resolve?: (
       ctx: {
         input: Input;
-        results: Results & BranchResults; // <- static branch results here
+        results: Results;
         context: Context;
       } & CallHelpers<Reg, ActionName>,
     ) => ResolveOut,
-    options?: StepOptions<Input, Results & BranchResults, Context>,
+    options?: StepOptions<Input, Results, Context>,
   ) {
     const result = this.step<ID, ActionName, ResolveOut>(
       id,
       action,
-      resolve as unknown as (
-        ctx: {
-          input: Input;
-          results: Results;
-          context: Context;
-        } & CallHelpers<Reg, ActionName>,
-      ) => ResolveOut,
-
+      resolve,
       [...this.frontier],
-      options as any,
+      options,
     );
 
     this.clearPendingWhen();
@@ -911,7 +871,7 @@ export class WorkflowBuilder<
     Reg,
     Input,
     Context,
-    [...Steps, ...WF["steps"]],
+    Steps,
     Results & {
       [K in Prefix]: SubflowResult<WorkflowResults<WF>, WorkflowOutput<WF>>;
     }
@@ -1015,6 +975,14 @@ export class WorkflowBuilder<
 /* ------------------------------------------------ */
 /* WORKFLOW CREATOR                                 */
 /* ------------------------------------------------ */
+// export function createWorkflow<
+//   Reg extends ActionRegistry,
+//   Context extends Record<string, any> = {},
+// >(registry: Reg, context?: Context) {
+//   return function workflow<Input = unknown>(name: string) {
+//     return new WorkflowBuilder<Reg, Input, Context>(name);
+//   };
+// }
 
 export function createWorkflow<
   Reg extends ActionRegistry,
