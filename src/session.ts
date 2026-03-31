@@ -2,11 +2,6 @@ import { ActionRegistry, WorkflowObserver } from "./types.js";
 import { WorkflowDef } from "./workflow-composer.js";
 import { executeWorkflow } from "./workflow-executor.js";
 
-type ModuleFlows<Reg extends ActionRegistry> = Record<
-  string,
-  WorkflowDef<Reg, any, any>
->;
-
 export class WorkflowSession<Reg extends ActionRegistry, Ctx> {
   private subscribers = new Set<(state: Partial<Ctx>) => void>();
   private running = false;

@@ -22,8 +22,9 @@ export function composeObserver<Reg extends ActionRegistry>(
 export function useLog(): WorkflowObserver {
   return async ({ frame, stepId }, next) => {
     eventStream.emit({
-      type: "node_start",
-      node: stepId,
+      stepId: frame.stepId,
+      state: "start",
+      start: frame.start,
       timestamp: frame.start,
       input: frame.input,
     });
@@ -32,8 +33,9 @@ export function useLog(): WorkflowObserver {
       const res = await next();
 
       eventStream.emit({
-        type: "node_success",
-        node: stepId,
+        id: frame.stepId,
+        state: frame.skipped ? "skipped" : "success",
+
         output: frame.output,
         duration: frame.end! - frame.start,
         attempts: frame.attempts,
@@ -43,11 +45,11 @@ export function useLog(): WorkflowObserver {
       return res;
     } catch (err) {
       eventStream.emit({
-        type: "node_fail",
-        node: stepId,
+        ...frame,
+        state: "fail",
         error: frame.error,
         timestamp: Date.now(),
-        attempts: frame.attempts,
+        // attempts: frame.attempts,
       });
 
       throw err;

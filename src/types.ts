@@ -51,6 +51,15 @@ export type WorkflowObserver<Reg extends ActionRegistry = any> = {
   ): Promise<any>;
 };
 
+export interface Executor {
+  run: (
+    wfId: string,
+    input: Record<string, any>,
+    context: Record<string, any>,
+    obververs?: WorkflowObserver[],
+  ) => Promise<any>;
+}
+
 // TODO: this needs enforcing
 type Observer = (
   frame: Readonly<ExecutionFrame>,
