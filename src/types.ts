@@ -55,8 +55,8 @@ export interface Executor {
   run: (
     wfId: string,
     input: Record<string, any>,
-    context: Record<string, any>,
-    obververs?: WorkflowObserver[],
+    services: ServiceRegistry,
+    obsververs?: WorkflowObserver[],
   ) => Promise<any>;
 }
 
@@ -65,3 +65,22 @@ type Observer = (
   frame: Readonly<ExecutionFrame>,
   extras: Record<string, any>,
 ) => void | Promise<void>;
+
+// workflow-composer
+
+export type ServiceRegistry = Record<
+  string,
+  Record<string, (...args: any[]) => any>
+>;
+
+export type ServiceParams<
+  S extends ServiceRegistry,
+  K extends keyof S,
+  M extends keyof S[K],
+> = Parameters<S[K][M]>;
+
+export type ServiceReturn<
+  S extends ServiceRegistry,
+  K extends keyof S,
+  M extends keyof S[K],
+> = Awaited<ReturnType<S[K][M]>>;

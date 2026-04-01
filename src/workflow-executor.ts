@@ -3,6 +3,7 @@ import {
   ActionRegistry,
   ExecutionFrame,
   Executor,
+  ServiceRegistry,
   WorkflowObserver,
 } from "./types.js";
 import {
@@ -65,16 +66,18 @@ async function runWithRetry(
 export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
   workflow,
   actionRegistry,
+  services,
   input,
-  context,
+
   depsExecutors,
   observers = [],
 }: {
   workflow: WorkflowDef<Reg, I, any, any, O>;
 
   actionRegistry: Reg;
+  services: ServiceRegistry;
   input: I;
-  context: any;
+
   depsExecutors: Record<string, Executor>;
   observers: WorkflowObserver<Reg>[];
 }): Promise<{
@@ -161,7 +164,7 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
           stepId,
           input,
           results,
-          context,
+
           actionRegistry,
           extras,
           frame,
@@ -169,7 +172,7 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
         const stepCtx = {
           input,
           results,
-          context,
+
           ...createCallHelpers(),
         };
 
@@ -203,7 +206,7 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
             const subExecution = await exec.run(
               subWfId,
               resolvedArgs,
-              context,
+              services,
               observers,
             );
 
@@ -229,7 +232,16 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
           // Normal action
           // -----------------------------
           const actionFn = async () => {
-            const action = actionRegistry[step.action];
+            let action = null;
+            if (step.action === "__service__") {
+              const { service, method } = step.serviceCall!;
+
+              action = services[service][method];
+            } else {
+              action = actionRegistry[step.action];
+            }
+
+            console.log("action", action);
             return await runAction(resolvedArgs, action);
           };
 
@@ -284,7 +296,6 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
     ? workflow.outputResolver({
         input,
         results,
-        context,
       })
     : results;
 

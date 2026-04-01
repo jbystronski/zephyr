@@ -36,11 +36,19 @@ const modRoot = createModuleFactory<RootCtx>()({
   define: ({}) => ({}),
 });
 
-const modA = createModuleFactory<ContextA>()({
+type Services = {
+  stripe: {
+    charge: (amount: number) => Promise<number>;
+    refund: (id: string) => Promise<boolean>;
+  };
+};
+
+const modA = createModuleFactory<Services>()({
   use: { modRoot },
   actionRegistry: regA,
   define: ({ wf }) => ({
     add: wf<{ a: number; b: number }>("add")
+      .seq("add", "a_add", (ctx) => ctx.args(ctx.input.a, ctx.input.b))
       .seq("add", "a_add", (ctx) => ctx.args(ctx.input.a, ctx.input.b))
       .output((ctx) => ({ addResult: ctx.results.add })),
   }),
