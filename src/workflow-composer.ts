@@ -838,6 +838,7 @@ export class WorkflowBuilder<
         };
       },
     ) => ResolveOut,
+    options?: StepOptions<Input, Results>,
   ): WorkflowBuilder<
     Reg,
     Services,
@@ -869,6 +870,7 @@ export class WorkflowBuilder<
       resolve: resolve ?? (() => ({ kind: "none" })),
       dependsOn: deps,
       when: this.pendingWhen,
+      options,
     });
 
     this.frontier = [id];
