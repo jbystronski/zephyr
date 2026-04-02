@@ -131,10 +131,10 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
         return await action(...input.args);
       case "object":
         return await action(input.args);
-      case "loop":
-        return await Promise.all(
-          input.items.map((item) => runAction(item, action)),
-        );
+      // case "loop":
+      //   return await Promise.all(
+      //     input.items.map((item) => runAction(item, action)),
+      //   );
       default:
         throw new Error(
           `Unknown ResolvedStepInput kind: ${(input as any).kind}`,
@@ -196,9 +196,58 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
           }
 
           // -----------------------------
-          // Subflow handling
+          // Pipe handling
           // -----------------------------
+
+          if (step.pipe && step.pipe.steps) {
+            const items = step.pipe.input(stepCtx);
+
+            const pipeResults = await Promise.all(
+              items.map(async (item) => {
+                let current = item;
+
+                for (const pipeStep of step.pipe!.steps) {
+                  const pipeCtx = {
+                    current,
+                    results,
+                    ...createCallHelpers(),
+                  };
+
+                  const resolved = pipeStep.resolve(pipeCtx);
+                  let action;
+
+                  if (pipeStep.type === "action") {
+                    action = actionRegistry[pipeStep.action!];
+                  } else {
+                    action = services[pipeStep.service!][pipeStep.method!];
+                  }
+
+                  if (!action) {
+                    throw new Error(
+                      `Unknown ${pipeStep.type} in pipe step: ${
+                        pipeStep.type === "action"
+                          ? pipeStep.action
+                          : `${pipeStep.service}.${pipeStep.method}`
+                      }`,
+                    );
+                  }
+
+                  current = await runAction(resolved, action);
+                }
+
+                return current;
+              }),
+            );
+
+            results[step.id] = pipeResults;
+            frame.output = pipeResults;
+            frame.end = Date.now();
+            return pipeResults;
+          }
           if (step.__subflowId) {
+            // -----------------------------
+            // Subflow handling
+            // -----------------------------
             const [modId, subWfId] = step.__subflowId.split(".");
 
             const exec = depsExecutors[modId];

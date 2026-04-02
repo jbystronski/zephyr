@@ -84,3 +84,34 @@ export type ServiceReturn<
   K extends keyof S,
   M extends keyof S[K],
 > = Awaited<ReturnType<S[K][M]>>;
+
+export type NormalizedCall =
+  | { kind: "none" }
+  | { kind: "positional"; args: any[] }
+  | { kind: "object"; args: any };
+
+export type CallHelpers<
+  Reg extends ActionRegistry,
+  ActionName extends keyof Reg,
+> = {
+  args: (...args: ActionParams<Reg, ActionName>) => {
+    kind: "positional";
+    args: ActionParams<Reg, ActionName>;
+  };
+
+  obj: ActionParams<Reg, ActionName> extends [infer A]
+    ? (arg: A) => { kind: "object"; args: A }
+    : never;
+
+  none: () => { kind: "none" };
+  // loop: (
+  //   items:
+  //     | { kind: "positional"; args: ActionParams<Reg, ActionName> }[]
+  //     | { kind: "object"; args: ActionParams<Reg, ActionName>[0] }[],
+  // ) => {
+  //   kind: "loop";
+  //   items: typeof items;
+  // };
+};
+
+/// pipe
