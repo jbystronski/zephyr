@@ -7,7 +7,9 @@ import { createModuleFactory } from "../../src/workflow-module";
 
 describe("Workflow engine - linear execution with when", () => {
   it("should execute steps in correct order and skip / run steps conditionally", async () => {
-    const wf = createWorkflow()<{ input: number }>("linear-test")
+    const wf = createWorkflow<typeof registryA, any, any>()<{ input: number }>(
+      "linear-test",
+    )
       .seq("step1", "add", (ctx) => ctx.args(ctx.input.input, 3))
       .seq("step2", "double", (ctx) => ctx.args(ctx.results.step1))
       .when((ctx) => ctx.results.step2 === 12)
@@ -33,7 +35,9 @@ describe("Workflow engine - linear execution with when", () => {
   });
 
   it("should skip step3 when condition is false", async () => {
-    const wf = createWorkflow()<{ input: number }>("linear-test")
+    const wf = createWorkflow<typeof registryA, any, any>()<{ input: number }>(
+      "linear-test",
+    )
       .seq("step1", "add", (ctx) => ctx.args(ctx.input.input, 3))
       .seq("step2", "double", (ctx) => ctx.args(ctx.results.step1))
       .when((ctx) => ctx.results.step2 === 999) // ❌ false

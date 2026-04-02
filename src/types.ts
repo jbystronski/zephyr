@@ -104,14 +104,6 @@ export type CallHelpers<
     : never;
 
   none: () => { kind: "none" };
-  // loop: (
-  //   items:
-  //     | { kind: "positional"; args: ActionParams<Reg, ActionName> }[]
-  //     | { kind: "object"; args: ActionParams<Reg, ActionName>[0] }[],
-  // ) => {
-  //   kind: "loop";
-  //   items: typeof items;
-  // };
 };
 
 /// pipe

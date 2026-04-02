@@ -3,25 +3,20 @@ import {
   ActionRegistry,
   ExecutionFrame,
   Executor,
+  NormalizedCall,
   ServiceRegistry,
   WorkflowObserver,
 } from "./types.js";
-import {
-  StepDef,
-  WorkflowDef,
-  ResolvedStepInput,
-} from "./workflow-composer.js";
+import { StepDef, WorkflowDef } from "./workflow-composer.js";
 
 export function createCallHelpers() {
   return {
     args: (...args: any[]) => ({ kind: "positional", args }),
     obj: (arg: any) => ({ kind: "object", args: arg }),
     none: () => ({ kind: "none" }),
-    loop: (items: any[]) => ({ kind: "loop", items }),
   };
 }
 
-// Helper to wrap action execution with timeout
 async function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
   if (!ms) return promise;
   return Promise.race([
@@ -119,7 +114,7 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
   // Normalized runner
   // -----------------------------
   const runAction = async (
-    input: ResolvedStepInput | undefined,
+    input: NormalizedCall | undefined,
     action: any,
   ): Promise<any> => {
     if (!input) return await action();
@@ -131,10 +126,6 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
         return await action(...input.args);
       case "object":
         return await action(input.args);
-      // case "loop":
-      //   return await Promise.all(
-      //     input.items.map((item) => runAction(item, action)),
-      //   );
       default:
         throw new Error(
           `Unknown ResolvedStepInput kind: ${(input as any).kind}`,
@@ -258,15 +249,6 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
               services,
               observers,
             );
-
-            // const subExecution = await executeWorkflow(
-            //   step.__subflowId,
-            //   workflowRegistry,
-            //   actionRegistry,
-            //   resolvedArgs as any,
-            //   context,
-            //   observers,
-            // );
 
             frame.output = subExecution.output;
             frame.end = Date.now();
