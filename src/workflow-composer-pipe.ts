@@ -61,7 +61,8 @@ export class PipeBuilder<
       ctx: {
         current: Current;
         results: Results;
-      } & CallHelpers<Reg, A>,
+      } & Results &
+        CallHelpers<Reg, A>,
     ) => NormalizedCall,
   ): PipeBuilder<
     ActionReturn<Reg, A>,
@@ -87,24 +88,16 @@ export class PipeBuilder<
     service: SK,
     method: MK,
     resolve: (
-      ctx: { current: Current; results: Results } & {
-        args: (...args: ServiceParams<Services, SK, MK>) => {
-          kind: "positional";
-          args: ServiceParams<Services, SK, MK>;
-        };
-        obj: ServiceParams<Services, SK, MK> extends [infer A]
-          ? (arg: A) => { kind: "object"; args: A }
-          : never;
-        none: () => { kind: "none" };
-        loop: (
-          items:
-            | { kind: "positional"; args: ServiceParams<Services, SK, MK> }[]
-            | { kind: "object"; args: ServiceParams<Services, SK, MK>[0] }[],
-        ) => {
-          kind: "loop";
-          items: typeof items;
-        };
-      },
+      ctx: { current: Current; results: Results } & Results & {
+          args: (...args: ServiceParams<Services, SK, MK>) => {
+            kind: "positional";
+            args: ServiceParams<Services, SK, MK>;
+          };
+          obj: ServiceParams<Services, SK, MK> extends [infer A]
+            ? (arg: A) => { kind: "object"; args: A }
+            : never;
+          none: () => { kind: "none" };
+        },
     ) => NormalizedCall,
   ): PipeBuilder<
     ServiceReturn<Services, SK, MK>,

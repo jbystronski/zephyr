@@ -150,7 +150,9 @@ export class WorkflowBuilder<
   private steps: StepDef<Reg, any, any>[] = [];
   private frontier: string[] = [];
 
-  private pendingWhen?: (ctx: { input: Input; results: Results }) => boolean;
+  private pendingWhen?: (
+    ctx: { input: Input; results: Results } & Results,
+  ) => boolean;
   private outputResolver?: (ctx: any) => any;
   private clearPendingWhen() {
     this.pendingWhen = undefined;
@@ -165,7 +167,8 @@ export class WorkflowBuilder<
       ctx: {
         input: Input;
         results: Results;
-      } & CallHelpers<Reg, ActionName>,
+      } & Results &
+        CallHelpers<Reg, ActionName>,
     ) => NormalizedCall,
     dependsOn?: string[],
     options?: StepOptions<Input, Results>,
@@ -207,7 +210,8 @@ export class WorkflowBuilder<
       ctx: {
         input: Input;
         results: Results;
-      } & CallHelpers<Reg, ActionName>,
+      } & Results &
+        CallHelpers<Reg, ActionName>,
     ) => NormalizedCall,
     options?: StepOptions<Input, Results>,
   ) {
@@ -226,16 +230,16 @@ export class WorkflowBuilder<
       ctx: {
         input: Input;
         results: Results;
-      } & {
-        args: (...args: ServiceParams<Services, SK, MK>) => {
-          kind: "positional";
-          args: ServiceParams<Services, SK, MK>;
-        };
-        obj: ServiceParams<Services, SK, MK> extends [infer A]
-          ? (arg: A) => { kind: "object"; args: A }
-          : never;
-        none: () => { kind: "none" };
-      },
+      } & Results & {
+          args: (...args: ServiceParams<Services, SK, MK>) => {
+            kind: "positional";
+            args: ServiceParams<Services, SK, MK>;
+          };
+          obj: ServiceParams<Services, SK, MK> extends [infer A]
+            ? (arg: A) => { kind: "object"; args: A }
+            : never;
+          none: () => { kind: "none" };
+        },
     ) => NormalizedCall,
     options?: StepOptions<Input, Results>,
   ): WorkflowBuilder<
@@ -404,7 +408,8 @@ export class WorkflowBuilder<
       ctx: {
         input: Input;
         results: Results;
-      } & CallHelpers<Reg, ActionName>,
+      } & Results &
+        CallHelpers<Reg, ActionName>,
     ) => NormalizedCall,
     options?: StepOptions<Input, Results>,
   ) {
@@ -450,12 +455,16 @@ export class WorkflowBuilder<
     return this as any;
   }
 
+  private _subflow = this.subflow.bind(this);
+  sub = ((...args: Parameters<typeof this._subflow>) =>
+    this._subflow(...args)) as this["subflow"];
+
   /* ------------------------------------------------ */
   /* Conditional                                      */
   /* ------------------------------------------------ */
 
   when(
-    predicate: (ctx: { input: Input; results: Results }) => boolean,
+    predicate: (ctx: { input: Input; results: Results } & Results) => boolean,
   ): WorkflowBuilder<Reg, Services, WFReg, Input, Steps, Results, Output> {
     this.pendingWhen = predicate;
     return this;
@@ -471,7 +480,7 @@ export class WorkflowBuilder<
   /* Workflow output                                  */
   /* ------------------------------------------------ */
   output<Output>(
-    fn: (ctx: { input: Input; results: Results }) => Output,
+    fn: (ctx: { input: Input; results: Results } & Results) => Output,
   ): WorkflowDef<Reg, Input, Results, Steps, Output> {
     this.outputResolver = fn;
     return this.build() as WorkflowDef<Reg, Input, Results, Steps, Output>;

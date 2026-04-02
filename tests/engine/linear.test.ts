@@ -9,7 +9,7 @@ describe("Workflow engine - linear execution", () => {
       "linear-test",
     )
       .seq("step1", "add", (ctx) => ctx.args(ctx.input.input, 2))
-      .seq("step2", "double", (ctx) => ctx.args(ctx.results.step1))
+      .seq("step2", "double", (ctx) => ctx.args(ctx.step1))
       .output((ctx) => ctx.results.step2);
 
     const { output } = await runWorkflow({

@@ -20,7 +20,7 @@ const child = createMod({
       .seq("add", "add", (ctx) => ctx.args(ctx.input.a, ctx.input.b))
       .service("payment", "stripe", "charge", (ctx) => ctx.args(444))
 
-      .output((ctx) => ctx.results.add);
+      .output((ctx) => ctx.add);
 
     return { sum };
   },
@@ -31,8 +31,8 @@ const parent = createMod({
   use: { child },
   define: ({ wf }) => {
     const test = wf("test")
-      .subflow("result", "child.sum", () => ({ a: 2, b: 3 }))
-      .output((ctx) => ctx.results.result);
+      .sub("result", "child.sum", () => ({ a: 2, b: 3 }))
+      .output((ctx) => ctx.result);
 
     return { test };
   },

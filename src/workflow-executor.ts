@@ -27,6 +27,29 @@ async function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
   ]);
 }
 
+function createStepCtx(input: any, results: any) {
+  const helpers = createCallHelpers();
+
+  return new Proxy(
+    {
+      input,
+      results,
+      ...helpers,
+    },
+    {
+      get(target, prop) {
+        // 1. explicit keys first
+        if (prop in target) return target[prop as keyof typeof target];
+
+        // 2. fallback to results
+        if (prop in results) return results[prop as keyof typeof target];
+
+        return undefined;
+      },
+    },
+  );
+}
+
 // Helper to run action with retry support
 async function runWithRetry(
   actionFn: () => Promise<any>,
@@ -160,12 +183,14 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
           extras,
           frame,
         };
-        const stepCtx = {
-          input,
-          results,
 
-          ...createCallHelpers(),
-        };
+        const stepCtx = createStepCtx(input, results);
+        // const stepCtx = {
+        //   input,
+        //   results,
+        //
+        //   ...createCallHelpers(),
+        // };
 
         const resolvedArgs = step.resolve?.(stepCtx);
 
@@ -323,11 +348,9 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
     throw new Error("Workflow execution failed (cycle or missing dependency)");
   }
 
+  const outputCtx = createStepCtx(input, results);
   const output = workflow.outputResolver
-    ? workflow.outputResolver({
-        input,
-        results,
-      })
+    ? workflow.outputResolver(outputCtx)
     : results;
 
   return {

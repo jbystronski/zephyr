@@ -19,9 +19,9 @@ describe("Workflow engine - linear execution with when", () => {
       .as<number | undefined>()
       .endWhen()
       .output((ctx) => ({
-        a: ctx.results.step2,
-        b: ctx.results.step3,
-        c: ctx.results.step4,
+        a: ctx.step2,
+        b: ctx.step3,
+        c: ctx.step4,
       }));
 
     const { output } = await runWorkflow({
@@ -38,20 +38,20 @@ describe("Workflow engine - linear execution with when", () => {
     const wf = createWorkflow<typeof registryA, any, any>()<{ input: number }>(
       "linear-test",
     )
-      .seq("step1", "add", (ctx) => ctx.args(ctx.input.input, 3))
-      .seq("step2", "double", (ctx) => ctx.args(ctx.results.step1))
-      .when((ctx) => ctx.results.step2 === 999) // ❌ false
-      .seq("step3", "add", (ctx) => ctx.args(ctx.results.step2, 3))
+      .seq("step1", "add", (c) => c.args(c.input.input, 3))
+      .seq("step2", "double", (c) => c.args(c.step1))
+      .when((c) => c.step2 === 999) // ❌ false
+      .seq("step3", "add", (c) => c.args(c.step2, 3))
       .as<number | undefined>()
-      .seq("step4", "add", (ctx) => ctx.args(ctx.results.step2, 3))
+      .seq("step4", "add", (c) => c.args(c.step2, 3))
       .as<number | undefined>()
       .endWhen()
-      .seq("step5", "double", (ctx) => ctx.args(ctx.results.step1))
-      .output((ctx) => ({
-        a: ctx.results.step2,
-        b: ctx.results.step3,
-        c: ctx.results.step4,
-        d: ctx.results.step5,
+      .seq("step5", "double", (ctx) => ctx.args(ctx.step1))
+      .output((c) => ({
+        a: c.step2,
+        b: c.step3,
+        c: c.step4,
+        d: c.step5,
       }));
 
     const { output } = await runWorkflow({
@@ -113,26 +113,28 @@ describe("Workflow engine - linear execution with when", () => {
   });
 
   it("should skip all parallel branches when condition is false", async () => {
-    const wf = createWorkflow()<{ input: number }>("parallel-when-test")
+    const wf = createWorkflow<typeof registryA, any, any>()<{ input: number }>(
+      "parallel-when-test",
+    )
       .seq("step1", "add", (ctx) => ctx.args(ctx.input.input, 3)) // 6
-      .seq("step2", "double", (ctx) => ctx.args(ctx.results.step1)) // 12
+      .seq("step2", "double", (ctx) => ctx.args(ctx.step1)) // 12
 
       .when((ctx) => ctx.results.step2 === 999) // ❌ false
 
       .parallel(
         (b0) =>
           b0
-            .seq("p0", "add", (ctx) => ctx.args(ctx.results.step2, 1))
+            .seq("p0", "add", (ctx) => ctx.args(ctx.step2, 1))
             .as<number | undefined>(),
 
         (b1) =>
           b1
-            .seq("p1", "add", (ctx) => ctx.args(ctx.results.step2, 2))
+            .seq("p1", "add", (ctx) => ctx.args(ctx.step2, 2))
             .as<number | undefined>(),
 
         (b2) =>
           b2
-            .seq("p2", "add", (ctx) => ctx.args(ctx.results.step2, 3))
+            .seq("p2", "add", (ctx) => ctx.args(ctx.step2, 3))
             .as<number | undefined>(),
       )
 
