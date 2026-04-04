@@ -223,11 +223,50 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
                 let current = item;
 
                 for (const pipeStep of step.pipe!.steps) {
-                  const pipeCtx = {
-                    current,
-                    results,
-                    ...createCallHelpers(),
-                  };
+                  //  return new Proxy(
+                  //     {
+                  //       input,
+                  //       results,
+                  //       ...helpers,
+                  //     },
+                  //     {
+                  //       get(target, prop) {
+                  //         // 1. explicit keys first
+                  //         if (prop in target) return target[prop as keyof typeof target];
+                  //
+                  //         // 2. fallback to results
+                  //         if (prop in results) return results[prop as keyof typeof target];
+                  //
+                  //         return undefined;
+                  //       },
+                  //     },
+                  //   );
+                  // }
+
+                  // const pipeCtx = {
+                  //   current,
+                  //   results,
+                  //   ...createCallHelpers(),
+                  // };
+
+                  const pipeCtx = new Proxy(
+                    {
+                      current,
+                      results,
+                      ...createCallHelpers(),
+                    },
+                    {
+                      get(target, prop) {
+                        if (prop in target)
+                          return target[prop as keyof typeof target];
+
+                        if (prop in results)
+                          return results[prop as keyof typeof target];
+
+                        return undefined;
+                      },
+                    },
+                  );
 
                   const resolved = pipeStep.resolve(pipeCtx);
                   let action;

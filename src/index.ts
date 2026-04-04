@@ -4,6 +4,7 @@ export * from "./workflow-executor.js";
 export * from "./workflow-composer.js";
 export * from "./workflow-module.js";
 
+export { exposeAll, exposeAllAs } from "./utils.js";
 export * from "./types.js";
 export * from "./session.js";
 export { useMetrics, useLog } from "./observer.js";

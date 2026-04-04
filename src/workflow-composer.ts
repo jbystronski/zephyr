@@ -119,7 +119,6 @@ type MergeBranchResults<
           : {})
     >
   : Acc;
-
 type MergeBranchSteps<
   Branches extends readonly any[],
   Acc extends any[],
@@ -134,7 +133,6 @@ type MergeBranchSteps<
       ]
     >
   : Acc;
-
 /* ------------------------------------------------ */
 /* FLUENT WORKFLOW BUILDER                          */
 /* ------------------------------------------------ */
@@ -149,10 +147,13 @@ export class WorkflowBuilder<
 > {
   private steps: StepDef<Reg, any, any>[] = [];
   private frontier: string[] = [];
-
   private pendingWhen?: (
-    ctx: { input: Input; results: Results } & Results,
+    ctx: {
+      input: Input;
+      results: Results;
+    } & Results,
   ) => boolean;
+
   private outputResolver?: (ctx: any) => any;
   private clearPendingWhen() {
     this.pendingWhen = undefined;
@@ -291,7 +292,7 @@ export class WorkflowBuilder<
     PB extends PipeBuilder<any, Reg, Services, Results, any>,
   >(
     id: ID,
-    input: (ctx: { input: Input; results: Results }) => Arr,
+    input: (ctx: { input: Input; results: Results } & Results) => Arr,
     builder: (p: PipeBuilder<Arr[number], Reg, Services, Results>) => PB,
     options?: StepOptions<Input, Results>,
   ): WorkflowBuilder<

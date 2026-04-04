@@ -6,6 +6,7 @@ import { registryA } from "../utils";
 import { useLog } from "../../src";
 type S1 = {
   enrich: (input: string, add: string) => string;
+  addAnimal: (input: { initArray: string[]; newAnimal: string }) => string[];
 };
 
 const createMod = createModuleFactory<{ s1: S1 }>();
@@ -14,10 +15,16 @@ const testPipe = createMod({
   actionRegistry: registryA,
 
   define: ({ wf }) => {
-    const test = wf<{ elements: string[] }>("pipeElements")
+    const test = wf<{ elements: string[]; another: string }>("pipeElements")
+      .service("add_animal", "s1", "addAnimal", (ctx) =>
+        ctx.obj({
+          initArray: ctx.input.elements,
+          newAnimal: ctx.input.another,
+        }),
+      )
       .pipe(
         "result",
-        (ctx) => ctx.input.elements,
+        (ctx) => ctx.add_animal,
         (p) =>
           p
             .action("uppercase", (ctx) => ctx.args(ctx.current))
@@ -27,7 +34,7 @@ const testPipe = createMod({
               ctx.args(ctx.current, "!"),
             ),
       )
-      .output((ctx) => ctx.results.result);
+      .output((ctx) => ctx.result);
 
     return { test };
   },
@@ -39,6 +46,10 @@ describe("Pipe", () => {
       services: {
         s1: {
           enrich: (input: string, add: string) => input + add,
+          addAnimal: (input: { initArray: string[]; newAnimal: string }) => {
+            const newArr = [...input.initArray, input.newAnimal];
+            return newArr;
+          },
         },
       },
     });
@@ -47,10 +58,11 @@ describe("Pipe", () => {
       "test",
       {
         elements: ["cat", "dog", "bird"],
+        another: "fish",
       },
       [useLog()],
     );
 
-    expect(res.output).toEqual(["<CAT>!", "<DOG>!", "<BIRD>!"]);
+    expect(res.output).toEqual(["<CAT>!", "<DOG>!", "<BIRD>!", "<FISH>!"]);
   });
 });
