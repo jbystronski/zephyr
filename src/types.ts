@@ -88,7 +88,9 @@ export type ServiceReturn<
 export type NormalizedCall =
   | { kind: "none" }
   | { kind: "positional"; args: any[] }
-  | { kind: "object"; args: any };
+  | { kind: "object"; args: any }
+  | { kind: "pipe_source"; args: any }
+  | { kind: "pipe_collect" };
 
 export type CallHelpers<
   Reg extends ActionRegistry,

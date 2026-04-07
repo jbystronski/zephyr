@@ -22,19 +22,23 @@ const testPipe = createMod({
           newAnimal: ctx.input.another,
         }),
       )
+
       .pipe(
-        "result",
-        (ctx) => ctx.add_animal,
-        (p) =>
-          p
-            .action("uppercase", (ctx) => ctx.args(ctx.current))
-            .action("addPrefix", (ctx) => ctx.args(ctx.current, "<"))
-            .action("addSuffix", (ctx) => ctx.args(ctx.current, ">"))
+        "pv2",
+        (ctx) => ctx.results.add_animal,
+        (b) =>
+          b
+            .seq("upp", "uppercase", (ctx) => ctx.args(ctx.input))
+            .seq("pref", "addPrefix", (ctx) => ctx.args(ctx.results.upp, "<"))
+            .seq("suffix", "addSuffix", (ctx) =>
+              ctx.args(ctx.results.pref, ">"),
+            )
             .service("enrich", "s1", "enrich", (ctx) =>
-              ctx.args(ctx.current, "!"),
+              ctx.args(ctx.results.suffix, "!"),
             ),
       )
-      .output((ctx) => ctx.result);
+
+      .output((ctx) => ctx.pv2);
 
     return { test };
   },

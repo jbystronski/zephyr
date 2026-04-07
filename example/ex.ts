@@ -1,95 +1,80 @@
-import { createActionRegistry, createModuleFactory } from "../src";
-
-const regA = createActionRegistry("a_")
-  .action("add", (a: number, b: number) => a + b)
-  .build();
-
-const regB = createActionRegistry("b_")
-  .action("divide", (a: number, b: number) => a / b)
-  .build();
-
-const regC = createActionRegistry("c_")
-  .action("multiply", (a: number, b: number) => a * b)
-  .build();
-
-type RootCtx = {
-  rootValue: boolean;
+import { createModuleFactory } from "../src/workflow-module";
+import { eventStream, useLog } from "../src";
+type S1 = {
+  enrich: (input: string, add: string) => string;
+  addAnimal: (input: { initArray: string[]; newAnimal: string }) => string[];
+};
+export const registryA = {
+  noop: () => {},
+  add: (a: number, b: number) => a + b,
+  sum: (input: { a: number; b: number }) => input.a + input.b,
+  double: (n: number) => n * 2,
+  addSuffix: (input: string, suffix: string) => input + suffix,
+  addPrefix: (input: string, prefix: string) => prefix + input,
+  uppercase: (input: string) => input.toUpperCase(),
 };
 
-type ContextA = {
-  maxConnections: number;
-  dbConnection: { isConnected: () => boolean };
-};
-
-type ContextB = {
-  paymentBroker: {
-    pay: (amount: number, intentId: string) => Promise<boolean>;
-  };
-};
-
-type ContextC = {
-  initialValue: string;
-};
-
-const modRoot = createModuleFactory<RootCtx>()({
-  actionRegistry: regA,
-  define: ({}) => ({}),
+eventStream.subscribe((ev: any) => {
+  console.dir(ev, { depth: 3 });
 });
 
-type Services = {
-  stripe: {
-    charge: (amount: number) => Promise<number>;
-    refund: (id: string) => Promise<boolean>;
-  };
-};
+type Entity = { animal: string; nums: number[] };
 
-const modA = createModuleFactory<Services>()({
-  use: { modRoot },
-  actionRegistry: regA,
-  define: ({ wf }) => ({
-    add: wf<{ a: number; b: number }>("add")
-      .seq("add", "a_add", (ctx) => ctx.args(ctx.input.a, ctx.input.b))
-      .seq("add", "a_add", (ctx) => ctx.args(ctx.input.a, ctx.input.b))
-      .output((ctx) => ({ addResult: ctx.results.add })),
-  }),
-});
+const createMod = createModuleFactory<{ s1: S1 }>();
 
-const modB = createModuleFactory<ContextB>()({
-  actionRegistry: regB,
-  define: ({ wf }) => ({
-    add: wf<{ a: number; b: number }>("divide")
-      .seq("divide", "b_divide", (ctx) => ctx.args(ctx.input.a, ctx.input.b))
-      .output((ctx) => ({ divideResult: ctx.results.divide })),
-  }),
-});
+const testPipe = createMod({
+  actionRegistry: registryA,
 
-const modC = createModuleFactory<ContextC>()({
-  use: { modA, modB },
-  actionRegistry: regC,
-  define: ({ wf }) => ({
-    call_add: wf<{ numA: number; numB: number }>("call_add")
-      .subflow("call_add", "modA.add", (ctx) => ({
-        a: ctx.input.numA,
-        b: ctx.input.numB,
-      }))
-      .output((ctx) => ctx.results.call_add),
-  }),
-});
+  define: ({ wf }) => {
+    const test = wf<{ elements: Entity[]; another: string }>("pipeElements")
+      .service("en", "s1", "enrich", (ctx) => ctx.args("WOLF", "~"))
+      .pipe(
+        "pv2",
+        (ctx) => ctx.input.elements,
+        (b) =>
+          b
+            .seq("upp", "uppercase", (ctx) => ctx.args(ctx.input.animal))
+            .seq("pref", "addPrefix", (ctx) => ctx.args(ctx.results.upp, "<"))
+            .seq("suffix", "addSuffix", (ctx) =>
+              ctx.args(ctx.results.pref, ">"),
+            )
+            .service("enrich", "s1", "enrich", (ctx) =>
+              ctx.args(ctx.results.suffix, "!"),
+            ),
+      )
 
-const payu = {
-  pay: async (amount: number, intentId: string) => {
-    return true;
-  },
-};
+      .service("add_animal", "s1", "addAnimal", (ctx) =>
+        ctx.obj({
+          initArray: ctx.results.pv2,
+          newAnimal: ctx.input.another,
+        }),
+      )
 
-const modCruntime = modC.createRuntime({
-  context: {
-    rootValue: false,
-    initialValue: "foo",
-    paymentBroker: payu,
-    maxConnections: 3,
-    dbConnection: { isConnected: () => true },
+      .output((ctx) => ctx.add_animal);
+
+    return { test };
   },
 });
 
-const r0 = modCruntime.run("modA.add", { a: 1, b: 2 });
+const rt = testPipe.createRuntime({
+  services: {
+    s1: {
+      enrich: (input: string, add: string) => input + add,
+      addAnimal: (input: { initArray: string[]; newAnimal: string }) => {
+        const newArr = [...input.initArray, input.newAnimal];
+        return newArr;
+      },
+    },
+  },
+});
+
+const res = await rt.run(
+  "test",
+  {
+    elements: [{ animal: "cat" }, { animal: "dog" }, { animal: "bird" }],
+    another: "fish",
+  },
+  [useLog()],
+);
+
+console.log(res);

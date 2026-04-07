@@ -10,12 +10,6 @@ import {
   Simplify,
 } from "./types.js";
 import { generateWorkflowId } from "./utils.js";
-import {
-  PipeBuilder,
-  PipeDef,
-  PipeFinalType,
-  StepsOfPipeBuilder,
-} from "./workflow-composer-pipe.js";
 
 /* ------------------------------------------------ */
 /* STEP INPUT NORMALIZATION TYPES                  */
@@ -56,7 +50,8 @@ export type StepDef<
   __subflowId?: string;
 
   serviceCall?: ServiceCall;
-  pipe?: PipeDef;
+  pipe?: { workflow: WorkflowDef<any, any, any> };
+  // pipe?: { steps: StepDef<Reg, ID, ActionName>[]; frontier: string[] };
 };
 
 /* ------------------------------------------------ */
@@ -92,6 +87,9 @@ type StepOptions<Input, Results> = {
   continueOnError?: boolean;
 
   onError?: (err: unknown, ctx: StepRuntimeCtx<Input, Results>) => any;
+  pipe?: {
+    parallel?: boolean;
+  };
 
   // optional later:
   label?: string;
@@ -136,6 +134,14 @@ type MergeBranchSteps<
 /* ------------------------------------------------ */
 /* FLUENT WORKFLOW BUILDER                          */
 /* ------------------------------------------------ */
+
+type LastStepOfBranch<B> =
+  B extends WorkflowBuilder<any, any, any, any, any, infer Results>
+    ? Results extends Record<string, infer Last>
+      ? Last
+      : never
+    : never;
+
 export class WorkflowBuilder<
   Reg extends ActionRegistry,
   Services extends ServiceRegistry,
@@ -282,52 +288,89 @@ export class WorkflowBuilder<
     return this as any;
   }
 
-  /* ----------------------- */
-  /* Pipe                    */
-  /* ----------------------- */
-
   pipe<
     ID extends string,
     Arr extends any[],
-    PB extends PipeBuilder<any, Reg, Services, Results, any>,
+    Branch extends WorkflowBuilder<Reg, Services, WFReg, Arr[number], any, any>,
   >(
     id: ID,
     input: (ctx: { input: Input; results: Results } & Results) => Arr,
-    builder: (p: PipeBuilder<Arr[number], Reg, Services, Results>) => PB,
+    builder: (
+      b: WorkflowBuilder<Reg, Services, WFReg, Arr[number], [], Results>,
+    ) => Branch,
     options?: StepOptions<Input, Results>,
   ): WorkflowBuilder<
     Reg,
     Services,
     WFReg,
     Input,
-    [...Steps, StepDef<Reg, ID, any>],
+    Steps,
     Simplify<
       Results & {
-        [K in ID]: PipeFinalType<StepsOfPipeBuilder<PB>, Reg, Services>[];
+        [K in ID]: LastStepOfBranch<Branch>[];
       }
     >
   > {
     const deps = [...this.frontier];
 
-    const pb = new PipeBuilder<any, Reg, Services, Results>();
-    const built = builder(pb);
+    const branchBuilder = new WorkflowBuilder<
+      Reg,
+      Services,
+      WFReg,
+      Arr[number],
+      [],
+      Results
+    >(this.name);
 
-    const steps = built.getSteps();
+    branchBuilder.frontier = [];
+    branchBuilder.pendingWhen = this.pendingWhen;
+
+    const built = builder(branchBuilder);
+
+    const wfId = generateWorkflowId(id);
+
+    const entrySteps = built.steps.filter((s) => s.dependsOn.length === 0);
+
+    const hasDependents = new Set<string>();
+    for (const step of built.steps) {
+      for (const dep of step.dependsOn) hasDependents.add(dep);
+    }
+    const endSteps = built.steps.filter((s) => !hasDependents.has(s.id));
+
+    const subWf: WorkflowDef<Reg, any, any> = {
+      _id: wfId,
+      input: {} as Input,
+      results: {} as Results,
+      name: `${id}_pipe`,
+      steps: built.steps,
+      // steps: built.steps,
+      entrySteps,
+      endSteps,
+      outputResolver: (ctx: any) => {
+        return built.frontier.length === 1
+          ? ctx[built.frontier[0]]
+          : built.frontier.map((f: string) => ctx[f]);
+      },
+    };
 
     this.steps.push({
       id,
-      action: "__pipe__",
-      pipe: {
-        input,
-        steps,
-      },
+      action: "__pipe_map__",
       dependsOn: deps,
       when: this.pendingWhen,
-      resolve: () => ({ kind: "none" }),
+      resolve: (ctx: any) => ({
+        kind: "pipe_source",
+        args: input(ctx),
+      }),
+
+      pipe: {
+        workflow: subWf,
+      },
       options,
     });
 
     this.frontier = [id];
+
     return this as any;
   }
 
