@@ -336,21 +336,6 @@ export type EnsureWorkflowShape<T> = {
     : never;
 };
 
-// export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
-//   ? {}
-//   : Simplify<
-//       EnsureWorkflowShape<
-//         UnionToIntersection<
-//           {
-//             [D in keyof Deps & string]: {
-//               [K in keyof Deps[D]["__public"] &
-//                 string as `${D}.${K}`]: Deps[D]["__public"][K];
-//             };
-//           }[keyof Deps & string]
-//         >
-//       >
-//     >;
-
 export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
   ? {}
   : Simplify<
@@ -366,6 +351,70 @@ export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
       >
     >;
 
+// export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
+//   ? {}
+//   : Simplify<
+//       EnsureWorkflowShape<
+//         UnionToIntersection<
+//           {
+//             [D in keyof Deps & string]: {
+//               [K in keyof Deps[D]["__public"] &
+//                 string as `${D}.${K}`]: Deps[D]["__public"][K];
+//             };
+//           }[keyof Deps & string]
+//         >
+//       >
+//     >;
+// export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
+//   ? {}
+//   : Simplify<{
+//       [D in keyof Deps as `${D & string}.${keyof Deps[D]["__public"] & string}`]: Deps[D]["__public"][keyof Deps[D]["__public"]];
+//     }>;
+//
+
+// export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
+//   ? {}
+//   : Simplify<
+//       // Just create the object directly without intersection
+//       Omit<
+//         {
+//           [D in keyof Deps & string]: {
+//             [K in keyof Deps[D]["__public"] &
+//               string as `${D}.${K}`]: Deps[D]["__public"][K];
+//           };
+//         }[keyof Deps & string],
+//         never
+//       >
+//     >;
+
+// export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
+//   ? {}
+//   : Simplify<
+//       EnsureWorkflowShape<
+//         {
+//           [D in keyof Deps & string]: {
+//             [K in keyof Deps[D]["__public"] &
+//               string as `${D}.${K}`]: Deps[D]["__public"][K];
+//           };
+//         }[keyof Deps & string]
+//       >
+//     >;
+
+// export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
+//   ? {}
+//   : Simplify<
+//       EnsureWorkflowShape<
+//         // Just use Omit + intersection - it's the same as UnionToIntersection but TypeScript handles it better
+//         {
+//           [D in keyof Deps & string]: {
+//             [K in keyof Deps[D]["__public"] &
+//               string as `${D}.${K}`]: Deps[D]["__public"][K];
+//           };
+//         }[keyof Deps & string] extends infer U
+//           ? Omit<U, never>
+//           : never
+//       >
+//     >;
 export type WorkflowRegistry<
   Own extends ModuleShape,
   Deps extends ModuleMap,

@@ -12,6 +12,14 @@ type PayService = {
 };
 
 const createMod = createModuleFactory<PayService>();
+const deepChildSecond = createMod({
+  actionRegistry: registryA,
+  define: ({ wf }) => ({
+    deepChildActionSecond: wf<{ init: string }>("deepChildActionSecond")
+      .seq("actionSecond", "uppercase", (ctx) => ctx.args(ctx.input.init))
+      .output((ctx) => ({ deepRes: ctx.results.actionSecond })),
+  }),
+});
 
 const deepChild = createMod({
   actionRegistry: registryA,
@@ -24,7 +32,7 @@ const deepChild = createMod({
 
 const child = createMod({
   actionRegistry: registryA,
-  use: { deepChild },
+  use: { deepChild, second: deepChildSecond },
   expose: { deepAction: "deepChild.deepChildAction" },
   define: ({ wf }) => ({
     sum: wf<{ a: number; b: number }>("sum")
@@ -71,7 +79,7 @@ describe("Subflow", () => {
       },
     });
 
-    // const childRes = childRt.run("")
+    // const childRes = childRt.run("sum")
     expect(res.output).toBe(5);
   });
 });

@@ -11,7 +11,14 @@
     "rootDir": "./src",
     "strict": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "preserveConstEnums": true,
+    "stripInternal": false,
+    "isolatedModules": false,
+    "verbatimModuleSyntax": false,
+    "noErrorTruncation": true,
+    "emitDeclarationOnly": false,
+    "declarationMap": true
   },
   "include": [
     "src/**/*",
