@@ -472,7 +472,7 @@ function createModule<
   function buildWorkflowMap() {
     const depWFs = Object.fromEntries(
       Object.entries(deps).flatMap(([name, mod]) =>
-        Object.entries(mod.workflows).map(([k, wf]) => [`${name}.${k}`, wf]),
+        Object.entries(mod.__public).map(([k, wf]) => [`${name}.${k}`, wf]),
       ),
     );
 
