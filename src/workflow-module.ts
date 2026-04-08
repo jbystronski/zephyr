@@ -336,6 +336,20 @@ type EnsureWorkflowShape<T> = {
     : never;
 };
 
+// type DepWorkflows<Deps extends ModuleMap> = Simplify<
+//   keyof Deps extends never
+//     ? {}
+//     : EnsureWorkflowShape<
+//         UnionToIntersection<
+//           {
+//             [D in keyof Deps & string]: {
+//               [K in keyof Deps[D]["__public"] &
+//                 string as `${D}.${K}`]: Deps[D]["__public"][K];
+//             };
+//           }[keyof Deps & string]
+//         >
+//       >
+// >;
 type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
   ? {}
   : Simplify<
@@ -462,7 +476,9 @@ function createModule<
 }): Module<Reg, S, Own, Use, ExposedWorkflows<Own, Use, Expose>> {
   const deps = (config.use ?? {}) as Use;
 
-  const wf = createWorkflow<Reg, DepWorkflows<Use>, S>();
+  type WFReg = DepWorkflows<Use>;
+
+  const wf = createWorkflow<Reg, WFReg, S>();
 
   const own = config.define({
     wf,
