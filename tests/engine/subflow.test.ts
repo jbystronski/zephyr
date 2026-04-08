@@ -40,7 +40,7 @@ const parent = createMod({
   use: { child },
   define: ({ wf }) => {
     const test = wf("test")
-      .sub("deepAction", "child.deepAction", (ctx) => ({ init: "abc" }))
+      .subflow("deepAction", "child.deepAction", () => ({ init: "abc" }))
       .sub("result", "child.sum", () => ({ a: 2, b: 3 }))
       .output((ctx) => ctx.result);
 

@@ -364,16 +364,14 @@ describe("Workflow engine - parallel with independent when per branch", () => {
     const createMod = createModuleFactory<{}>();
     const child = createMod({
       actionRegistry: registryA,
-      define: ({ wf }) => {
-        const sum = wf<{ a: number; b: number }>("sum")
+      define: ({ wf }) => ({
+        sum: wf<{ a: number; b: number }>("sum")
           .seq("add", "add", (ctx) => {
             executed = true; // 🔥 detect execution
             return ctx.args(ctx.input.a, ctx.input.b);
           })
-          .output((ctx) => ctx.results.add);
-
-        return { sum };
-      },
+          .output((ctx) => ctx.results.add),
+      }),
     });
 
     const parent = createMod({
