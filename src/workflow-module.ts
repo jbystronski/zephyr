@@ -374,7 +374,7 @@ type WorkflowRegistry<Own extends ModuleShape, Deps extends ModuleMap> = Own &
 
 type AnyWorkflow = WorkflowDef<any, any, any, any, any>;
 type ModuleShape = Record<string, AnyWorkflow>;
-type ModuleMap = Record<string, Module<any, any, any, any>>;
+type ModuleMap = Record<string, Module<any, any, any, any, ModuleShape>>;
 
 type FinalServices<S extends ServiceRegistry, Deps extends ModuleMap> = S &
   ServicesFromDepsRecursive<Deps>;
@@ -389,7 +389,8 @@ type ServicesFromDepsRecursive<Deps extends ModuleMap> = [keyof Deps] extends [
           any,
           infer S,
           any,
-          infer SubDeps
+          infer SubDeps,
+          any
         >
           ? S & ServicesFromDepsRecursive<SubDeps>
           : never;
@@ -418,7 +419,7 @@ export type Module<
   S extends ServiceRegistry,
   Own extends ModuleShape,
   Deps extends ModuleMap,
-  Public extends ModuleShape = Own,
+  Public extends ModuleShape,
 > = {
   workflows: Own;
 
@@ -473,7 +474,7 @@ function createModule<
   use?: Use;
   expose?: Expose;
   define: (ctx: ModuleContext<Reg, DepWorkflows<Use>, S>) => Own;
-}): Module<Reg, S, Own, Use, ExposedWorkflows<Own, Use, Expose>> {
+}): Module<Reg, S, Own, Use, ExposedWorkflows<Own, Use, Expose> & ModuleShape> {
   const deps = (config.use ?? {}) as Use;
 
   type WFReg = DepWorkflows<Use>;
