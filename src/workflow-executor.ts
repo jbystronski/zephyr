@@ -627,6 +627,11 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
             return undefined;
           }
 
+          if (step.action === "__join__") {
+            results[step.id] = undefined;
+            return undefined;
+          }
+
           if (step.action === "__pipe_map__") {
             const isParallel = step?.options?.pipe?.parallel;
 
@@ -650,7 +655,6 @@ export async function executeWorkflow<Reg extends ActionRegistry, I, R, O = R>({
             );
 
             const settled = await Promise.all(executions);
-            console.log("SETTLED", settled);
 
             // ✅ preserve order (IMPORTANT)
             const outputs = settled

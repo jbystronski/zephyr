@@ -138,7 +138,7 @@ describe("Workflow engine - linear execution with when", () => {
             .as<number | undefined>(),
       )
 
-      .join("join", "noop")
+      .join("join")
 
       .output((ctx) => ({
         base: ctx.results.step2,
@@ -192,7 +192,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
             .as<number | undefined>(),
       )
 
-      .join("join", "noop")
+      .join("join")
 
       .output((ctx) => ({
         base: ctx.results.step2,
@@ -232,7 +232,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
         (b1) => b1.seq("p1", "add", (ctx) => ctx.args(ctx.results.step2, 2)),
       )
 
-      .join("join", "noop")
+      .join("join")
 
       .output((ctx) => ({
         p0: ctx.results.p0,
@@ -285,7 +285,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
 
       .endWhen()
 
-      .join("join", "noop")
+      .join("join")
 
       .output((ctx) => ({
         base: ctx.results.step2,
@@ -331,7 +331,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
 
       .endWhen()
 
-      .join("join", "noop")
+      .join("join")
 
       // MUST still run
       .seq("after", "double", (ctx) => ctx.args(ctx.results.step1))

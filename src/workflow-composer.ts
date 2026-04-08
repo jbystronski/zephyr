@@ -447,22 +447,23 @@ export class WorkflowBuilder<
   /* ------------------------------------------------ */
   join<ID extends string = string, ActionName extends keyof Reg & string = any>(
     id: ID,
-    action: ActionName,
-    resolve?: (
-      ctx: {
-        input: Input;
-        results: Results;
-      } & Results &
-        CallHelpers<Reg, ActionName>,
-    ) => NormalizedCall,
-    options?: StepOptions<Input, Results>,
+    // action: ActionName,
+    // resolve?: (
+    //   ctx: {
+    //     input: Input;
+    //     results: Results;
+    //   } & Results &
+    //     CallHelpers<Reg, ActionName>,
+    // ) => NormalizedCall,
+    // options?: StepOptions<Input, Results>,
   ) {
     const result = this.step<ID, ActionName>(
       id,
-      action,
-      resolve,
+      "__join__" as ActionName,
+      undefined,
+      // resolve,
       [...this.frontier],
-      options,
+      // options,
     );
 
     this.clearPendingWhen();
@@ -472,10 +473,12 @@ export class WorkflowBuilder<
   subflow<Prefix extends string, K extends keyof WFReg & string>(
     prefix: Prefix,
     workflowKey: K,
-    resolveInput: (ctx: {
-      input: Input;
-      results: Results;
-    }) => WorkflowInput<WFReg[K]>,
+    resolveInput: (
+      ctx: {
+        input: Input;
+        results: Results;
+      } & Results,
+    ) => WorkflowInput<WFReg[K]>,
     options?: StepOptions<Input, Results>,
   ): WorkflowBuilder<
     Reg,

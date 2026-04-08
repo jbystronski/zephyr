@@ -24,7 +24,7 @@ describe("Parallel execution", () => {
         (b) => b.seq("b", "b"),
         (b) => b.seq("c", "c"),
       )
-      .join("join", "noop");
+      .join("j");
 
     await runWorkflow({ workflow: wf, registry, observers: [] });
 
