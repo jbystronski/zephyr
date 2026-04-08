@@ -48,6 +48,7 @@ const child = createMod({
 const parent = createMod({
   actionRegistry: registryA,
   use: { child },
+  expose: { sub: "child.sum" },
   define: ({ wf }) => {
     const test = wf("test")
       .subflow("deepAction", "child.deepAction", () => ({ init: "abc" }))
@@ -71,7 +72,7 @@ describe("Subflow", () => {
       },
     });
 
-    const res = await rt.run("test", {}, [useLog()]);
+    const res = await rt.run("sub", {}, [useLog()]);
 
     const childRt = child.createRuntime({
       services: {

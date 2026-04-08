@@ -828,41 +828,36 @@ function createModule<
     services: {} as S,
   });
 
-  function buildWorkflowMap() {
-    // Get all workflows from dependencies (prefixed)
-    const depWFs = Object.fromEntries(
-      Object.entries(deps).flatMap(([name, mod]) =>
-        Object.entries(mod.workflows).map(([k, wf]) => [`${name}.${k}`, wf]),
-      ),
-    );
+  // Build a map of ALL dependency workflows (for internal execution only)
+  const allDepWorkflows = Object.fromEntries(
+    Object.entries(deps).flatMap(([name, mod]) =>
+      Object.entries(mod.workflows).map(([k, wf]) => [`${name}.${k}`, wf]),
+    ),
+  );
 
-    const internalBase = { ...own, ...depWFs } as WorkflowRegistry<Own, Use>;
-
-    // Build exposed workflows by looking up from internalBase
-    const exposed = {} as Record<string, AnyWorkflow>;
-    if (config.expose) {
-      for (const alias in config.expose) {
-        const key = config.expose[alias] as string;
-        exposed[alias] = internalBase[key];
+  // Build exposed workflows (only those explicitly exposed)
+  const exposedWorkflows: Record<string, AnyWorkflow> = {};
+  if (config.expose) {
+    for (const [alias, key] of Object.entries(config.expose)) {
+      const workflow = allDepWorkflows[key as string];
+      if (workflow) {
+        exposedWorkflows[alias] = workflow as AnyWorkflow;
       }
     }
-
-    // Merge exposed into public workflows
-    const publicMap = { ...own, ...exposed } as ExposedWorkflows<
-      Own,
-      Use,
-      Expose
-    >;
-
-    const internal = {
-      ...internalBase,
-      ...exposed,
-    } as WorkflowRegistry<Own, Use> & typeof exposed;
-
-    return { internal, publicMap };
   }
 
-  const { internal, publicMap } = buildWorkflowMap();
+  // Final public workflows = own + exposed (NOT all dependency workflows)
+  const finalWorkflows = {
+    ...own,
+    ...exposedWorkflows,
+  };
+
+  // For internal execution, we need ALL workflows (own + all deps + exposed)
+  const internalWorkflows = {
+    ...own,
+    ...allDepWorkflows,
+    ...exposedWorkflows,
+  };
 
   const depsExecutors = Object.fromEntries(
     Object.entries(deps).map(([name, mod]) => [name, mod.__getExecutor()]),
@@ -870,11 +865,7 @@ function createModule<
 
   const executor: Executor = {
     run(wfId, input, services, observers = []) {
-      if (!(wfId in publicMap)) {
-        throw new Error(`Workflow not in public: ${wfId}`);
-      }
-
-      const workflow = internal[wfId];
+      const workflow = internalWorkflows[wfId as string];
 
       if (!workflow) {
         throw new Error(`Workflow not found: ${String(wfId)}`);
@@ -891,18 +882,32 @@ function createModule<
     },
   };
 
+  // Return as Module type, but we know finalWorkflows matches ExposedWorkflows
   return {
-    workflows: publicMap, // ← KEY CHANGE: return publicMap (with exposed merged) as workflows
+    workflows: finalWorkflows as ExposedWorkflows<Own, Use, Expose>,
     __getExecutor: () => executor,
 
     createRuntime({ services }) {
       return {
-        run: async <K extends keyof typeof publicMap>(
+        run: async <K extends keyof ExposedWorkflows<Own, Use, Expose>>(
           workflowId: K,
-          input: WorkflowInput<(typeof publicMap)[K]>,
+          input: WorkflowInput<ExposedWorkflows<Own, Use, Expose>[K]>,
           observers: WorkflowObserver<Reg>[] = [],
         ) => {
-          return executor.run(workflowId as string, input, services, observers);
+          // The workflow might be in exposedWorkflows or own
+          const workflow = (finalWorkflows as any)[workflowId as string];
+          if (!workflow) {
+            throw new Error(`Workflow not found: ${String(workflowId)}`);
+          }
+
+          return executeWorkflow({
+            workflow,
+            actionRegistry: config.actionRegistry,
+            depsExecutors,
+            input,
+            services,
+            observers,
+          });
         },
 
         getServices: () => ({ ...services }) as FinalServices<S, Use>,
