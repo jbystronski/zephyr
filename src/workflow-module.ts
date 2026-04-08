@@ -336,10 +336,10 @@ export type EnsureWorkflowShape<T> = {
     : never;
 };
 
-// type DepWorkflows<Deps extends ModuleMap> = Simplify<
-//   keyof Deps extends never
-//     ? {}
-//     : EnsureWorkflowShape<
+// export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
+//   ? {}
+//   : Simplify<
+//       EnsureWorkflowShape<
 //         UnionToIntersection<
 //           {
 //             [D in keyof Deps & string]: {
@@ -349,7 +349,8 @@ export type EnsureWorkflowShape<T> = {
 //           }[keyof Deps & string]
 //         >
 //       >
-// >;
+//     >;
+
 export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
   ? {}
   : Simplify<
@@ -490,6 +491,17 @@ function createModule<
     services: {} as S,
   });
 
+  function mergePublic<
+    Own extends ModuleShape,
+    Use extends ModuleMap,
+    Expose extends Record<string, keyof DepWorkflows<Use>> | undefined,
+  >(
+    own: Own,
+    exposed: Record<string, AnyWorkflow>,
+  ): ExposedWorkflows<Own, Use, Expose> {
+    return { ...own, ...exposed } as any;
+  }
+
   function buildWorkflowMap() {
     const depWFs = Object.fromEntries(
       Object.entries(deps).flatMap(([name, mod]) =>
@@ -512,11 +524,13 @@ function createModule<
       ...exposed,
     } as WorkflowRegistry<Own, Use> & typeof exposed;
 
-    const publicMap = { ...own, ...exposed } as ExposedWorkflows<
-      Own,
-      Use,
-      Expose
-    >;
+    // const publicMap = { ...own, ...exposed } as ExposedWorkflows<
+    //   Own,
+    //   Use,
+    //   Expose
+    // >;
+
+    const publicMap = mergePublic<Own, Use, Expose>(own, exposed);
     return { internal, publicMap };
   }
 

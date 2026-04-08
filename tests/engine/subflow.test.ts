@@ -71,7 +71,7 @@ describe("Subflow", () => {
       },
     });
 
-    // cost childRes = childRt.run("")
+    // const childRes = childRt.run("")
     expect(res.output).toBe(5);
   });
 });
