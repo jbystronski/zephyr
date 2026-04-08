@@ -330,7 +330,7 @@ type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
 /* WORKFLOW REGISTRY TYPES                          */
 /* ------------------------------------------------ */
 
-type EnsureWorkflowShape<T> = {
+export type EnsureWorkflowShape<T> = {
   [K in keyof T]: T[K] extends WorkflowDef<any, any, any, any, any>
     ? T[K]
     : never;
@@ -350,7 +350,7 @@ type EnsureWorkflowShape<T> = {
 //         >
 //       >
 // >;
-type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
+export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
   ? {}
   : Simplify<
       EnsureWorkflowShape<
@@ -365,23 +365,27 @@ type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
       >
     >;
 
-type WorkflowRegistry<Own extends ModuleShape, Deps extends ModuleMap> = Own &
-  DepWorkflows<Deps>;
+export type WorkflowRegistry<
+  Own extends ModuleShape,
+  Deps extends ModuleMap,
+> = Own & DepWorkflows<Deps>;
 
 /* ------------------------------------------------ */
 /* MODULE TYPES                                     */
 /* ------------------------------------------------ */
 
-type AnyWorkflow = WorkflowDef<any, any, any, any, any>;
-type ModuleShape = Record<string, AnyWorkflow>;
-type ModuleMap = Record<string, Module<any, any, any, any, ModuleShape>>;
+export type AnyWorkflow = WorkflowDef<any, any, any, any, any>;
+export type ModuleShape = Record<string, AnyWorkflow>;
+export type ModuleMap = Record<string, Module<any, any, any, any, ModuleShape>>;
 
-type FinalServices<S extends ServiceRegistry, Deps extends ModuleMap> = S &
-  ServicesFromDepsRecursive<Deps>;
+export type FinalServices<
+  S extends ServiceRegistry,
+  Deps extends ModuleMap,
+> = S & ServicesFromDepsRecursive<Deps>;
 
-type ServicesFromDepsRecursive<Deps extends ModuleMap> = [keyof Deps] extends [
-  never,
-]
+export type ServicesFromDepsRecursive<Deps extends ModuleMap> = [
+  keyof Deps,
+] extends [never]
   ? {} // no deps
   : UnionToIntersection<
       {
@@ -444,7 +448,7 @@ export type Module<
 /* MODULE CONTEXT (FIXED)                           */
 /* ------------------------------------------------ */
 
-type ModuleContext<
+export type ModuleContext<
   Reg extends ActionRegistry,
   WFReg extends Record<string, WorkflowDef<any, any, any, any, any>>,
   S extends ServiceRegistry,
@@ -453,7 +457,7 @@ type ModuleContext<
   services: S;
 };
 
-type ExposedWorkflows<
+export type ExposedWorkflows<
   Own extends ModuleShape,
   Use extends ModuleMap,
   Expose extends Record<string, keyof DepWorkflows<Use>> | undefined,
