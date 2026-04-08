@@ -1,7 +1,7 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import { createModuleFactory } from "../../src/workflow-module";
+import { createModuleFactory, DepWorkflows } from "../../src/workflow-module";
 import { registryA } from "../utils";
 import { useLog } from "../../src";
 
@@ -34,6 +34,8 @@ const child = createMod({
       .output((ctx) => ctx.add),
   }),
 });
+
+type T = DepWorkflows<{ child: typeof child }>;
 
 const parent = createMod({
   actionRegistry: registryA,

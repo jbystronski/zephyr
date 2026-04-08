@@ -376,7 +376,7 @@ export type WorkflowRegistry<
 
 export type AnyWorkflow = WorkflowDef<any, any, any, any, any>;
 export type ModuleShape = Record<string, AnyWorkflow>;
-export type ModuleMap = Record<string, Module<any, any, any, any, ModuleShape>>;
+export type ModuleMap = Record<string, Module<any, any, any, any, any>>;
 
 export type FinalServices<
   S extends ServiceRegistry,
