@@ -8,7 +8,7 @@ export function generateWorkflowId(name: string) {
 
 export function exposeAll<
   Name extends string,
-  M extends Module<any, any, any, any, any>,
+  M extends Module<any, any, any, any>,
 >(name: Name, mod: M) {
   type Keys = keyof M["workflows"] & string;
 
@@ -24,7 +24,7 @@ export function exposeAll<
 
 export function exposeAllAs<
   Name extends string,
-  M extends Module<any, any, any, any, any>,
+  M extends Module<any, any, any, any>,
 >(name: Name, mod: M) {
   type Keys = keyof M["workflows"] & string;
 
