@@ -583,9 +583,9 @@ function createModule<
 
 export function createModuleFactory<S extends ServiceRegistry>() {
   return function <
-    Reg extends ActionRegistry = Record<string, any>,
-    Use extends ModuleMap = {},
-    Own extends ModuleShape = {},
+    Reg extends ActionRegistry,
+    Use extends ModuleMap,
+    Own extends ModuleShape,
     Expose extends Record<string, keyof DepWorkflows<Use>> | undefined =
       undefined,
   >(config: {
