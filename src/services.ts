@@ -1,0 +1,451 @@
+// export const stdLib = {
+//   evalCondition: (cond: any, left: any, right: any) => (cond ? left : right),
+//   coalesce: (left: any, right: any) => left ?? right,
+//   getKey: (o: Record<string, unknown>, k: string) => o?.[k],
+//   mapValues: (obj: Record<string, any>, fn: any) => {
+//     const out: any = {};
+//     for (const k in obj) {
+//       out[k] = fn(obj[k], k);
+//     }
+//     return out;
+//   },
+//   arrayAt: (arr: any[], i: number) => arr?.[i],
+//   ensureArray: (v: any[]) => (Array.isArray(v) ? v : v ? [v] : []),
+//   compact: (obj: Record<string, any>) => {
+//     const out: any = {};
+//     for (const k in obj) {
+//       const v = obj[k];
+//       if (v !== undefined && v !== null) {
+//         out[k] = v;
+//       }
+//     }
+//     return out;
+//   },
+//
+//   withFallback: (v: any, fallback: any) =>
+//     v === undefined || v === null ? fallback : v,
+//   pick: (obj: Record<string, any>, keys: string[]) => {
+//     const out: any = {};
+//     for (const k of keys) {
+//       if (k in obj) out[k] = obj[k];
+//     }
+//     return out;
+//   },
+//   omit: (obj: Record<string, any>, keys: any[]) => {
+//     const out = { ...obj };
+//     for (const k of keys) delete out[k];
+//     return out;
+//   },
+//
+//   merge: (...objs: Record<string, any>[]) => {
+//     const out: Record<string, any> = {};
+//     for (const obj of objs) {
+//       if (!obj || typeof obj !== "object") continue;
+//       Object.assign(out, obj);
+//     }
+//     return out;
+//   },
+//
+//   concatStrings: (...parts: any[]) => {
+//     return parts.join("");
+//   },
+//   toConst: (object: Record<string, any>) => object,
+//   arrayFromLen: (len: number) => Array.from({ length: len }),
+// };
+//
+
+export const stdLib = {
+  // --- control ---
+  if: (cond: any, a: any, b: any) => (cond ? a : b),
+  coalesce: (a: any, b: any) => a ?? b,
+
+  // --- object ---
+  get: (obj: any, key: string) => obj?.[key],
+  merge: (...objs: Record<string, any>[]) => {
+    const out: Record<string, any> = {};
+    for (const o of objs) {
+      if (o && typeof o === "object") Object.assign(out, o);
+    }
+    return out;
+  },
+  pick: (obj: Record<string, any>, keys: string[]): Record<string, any> => {
+    const out: any = {};
+    for (const k of keys) if (k in obj) out[k] = obj[k];
+    return out;
+  },
+  omit: (obj: Record<string, any>, keys: string[]) => {
+    const out = { ...obj };
+    for (const k of keys) delete out[k];
+    return out;
+  },
+
+  // --- array ---
+  at: (arr: any[], i: number) => arr?.[i],
+  ensure: (v: any) => (Array.isArray(v) ? v : v ? [v] : []),
+  map: (arr: any[], fn: (v: any, i?: number) => any) => arr.map(fn),
+
+  // --- object transforms ---
+  mapValues: (obj: Record<string, any>, fn: any) => {
+    const out: any = {};
+    for (const k in obj) out[k] = fn(obj[k], k);
+    return out;
+  },
+
+  // --- cleanup ---
+  compact: (obj: Record<string, any>) => {
+    const out: any = {};
+    for (const k in obj) {
+      const v = obj[k];
+      if (v !== undefined && v !== null) out[k] = v;
+    }
+    return out;
+  },
+
+  // --- misc ---
+  concat: (...parts: any[]) => parts.join(""),
+  const: (v: any) => v,
+};
+
+export const dateLib = {
+  now: () => new Date(),
+
+  from: (input: string | number | Date) => new Date(input),
+  safeFrom: (input: any): Date | null => {
+    const d = new Date(input);
+    return isNaN(d.getTime()) ? null : d;
+  },
+
+  toISO: (d: Date) => d.toISOString(),
+  toTimestamp: (d: Date) => d.getTime(),
+
+  convert: (
+    timestampMs: number,
+    to: "ms" | "seconds" | "minutes" | "hours" | "days",
+  ): number => {
+    switch (to) {
+      case "ms":
+        return timestampMs;
+      case "seconds":
+        return Math.floor(timestampMs / 1000);
+      case "minutes":
+        return Math.floor(timestampMs / (1000 * 60));
+      case "hours":
+        return Math.floor(timestampMs / (1000 * 60 * 60));
+      case "days":
+        return Math.floor(timestampMs / (1000 * 60 * 60 * 24));
+      default:
+        throw new Error(`Invalid conversion target: ${to}`);
+    }
+  },
+
+  // Convert from any unit to milliseconds
+  toMs: (
+    value: number,
+    from: "ms" | "seconds" | "minutes" | "hours" | "days",
+  ): number => {
+    switch (from) {
+      case "ms":
+        return value;
+      case "seconds":
+        return value * 1000;
+      case "minutes":
+        return value * 60 * 1000;
+      case "hours":
+        return value * 60 * 60 * 1000;
+      case "days":
+        return value * 24 * 60 * 60 * 1000;
+      default:
+        throw new Error(`Invalid conversion source: ${from}`);
+    }
+  },
+
+  // Convert duration between units
+  convertDuration: (
+    value: number,
+    from: "ms" | "seconds" | "minutes" | "hours" | "days",
+    to: "ms" | "seconds" | "minutes" | "hours" | "days",
+  ): number => {
+    const inMs = dateLib.toMs(value, from);
+    return dateLib.convert(inMs, to);
+  },
+
+  add: (
+    d: Date,
+    opts: {
+      ms?: number;
+      seconds?: number;
+      minutes?: number;
+      hours?: number;
+      days?: number;
+    },
+  ) => {
+    let t = d.getTime();
+    if (opts.ms) t += opts.ms;
+    if (opts.seconds) t += opts.seconds * 1000;
+    if (opts.minutes) t += opts.minutes * 60_000;
+    if (opts.hours) t += opts.hours * 3_600_000;
+    if (opts.days) t += opts.days * 86_400_000;
+    return new Date(t);
+  },
+
+  sub: (
+    d: Date,
+    opts: {
+      ms?: number;
+      seconds?: number;
+      minutes?: number;
+      hours?: number;
+      days?: number;
+    },
+  ) => {
+    let t = d.getTime();
+    if (opts.ms) t -= opts.ms;
+    if (opts.seconds) t -= opts.seconds * 1000;
+    if (opts.minutes) t -= opts.minutes * 60_000;
+    if (opts.hours) t -= opts.hours * 3_600_000;
+    if (opts.days) t -= opts.days * 86_400_000;
+    return new Date(t);
+  },
+
+  startOfDay: (d: Date) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  },
+
+  endOfDay: (d: Date) => {
+    const x = new Date(d);
+    x.setHours(23, 59, 59, 999);
+    return x;
+  },
+
+  compare: (a: Date, b: Date) => a.getTime() - b.getTime(),
+  isBefore: (a: Date, b: Date) => a.getTime() < b.getTime(),
+  isAfter: (a: Date, b: Date) => a.getTime() > b.getTime(),
+};
+
+export const stringLib = {
+  lower: (s: string) => s.toLowerCase(),
+  upper: (s: string) => s.toUpperCase(),
+  trim: (s: string) => s.trim(),
+
+  includes: (s: string, sub: string) => s.includes(sub),
+  startsWith: (s: string, sub: string) => s.startsWith(sub),
+  endsWith: (s: string, sub: string) => s.endsWith(sub),
+
+  slice: (s: string, start?: number, end?: number) => s.slice(start, end),
+
+  replace: (s: string, search: string, value: string) =>
+    s.replace(search, value),
+
+  split: (s: string, sep: string) => s.split(sep),
+  join: (arr: string[], sep: string) => arr.join(sep),
+
+  length: (s: string) => s.length,
+};
+
+export const arrayLib = {
+  length: (arr: any[]) => arr?.length ?? 0,
+
+  // --- access ---
+  first: (arr: any[]) => arr?.[0],
+  last: (arr: any[]) => arr?.[arr.length - 1],
+  at: (arr: any[], i: number) => arr?.[i],
+
+  // --- mutation-like (pure) ---
+
+  append: (arr: any[], item: any) => [...(arr ?? []), item],
+  prepend: (arr: any[], item: any) => [item, ...(arr ?? [])],
+  fromLen: (len: number) => Array.from({ length: len }),
+
+  removeAt: (arr: any[], i: number) =>
+    arr ? arr.filter((_, idx) => idx !== i) : [],
+
+  insertAt: (arr: any[], i: number, item: any) => {
+    const a = [...(arr ?? [])];
+    a.splice(i, 0, item);
+    return a;
+  },
+  replaceAt: (arr: any[], i: number, item: any) => {
+    const a = [...(arr ?? [])];
+    a.splice(i, 1, item); // Note: 1 as delete count
+    return a;
+  },
+
+  replaceFirst: (arr: any[], item: any) =>
+    arr?.length ? arrayLib.replaceAt(arr, 0, item) : [],
+
+  replaceLast: (arr: any[], item: any) =>
+    arr?.length ? arrayLib.replaceAt(arr, arr.length - 1, item) : [],
+
+  // --- set-like ---
+  unique: (arr: any[]) => Array.from(new Set(arr)),
+  includes: (arr: any[], v: any) => arr?.includes(v) ?? false,
+
+  // --- set operations ---
+  union: (...arrays: any[][]) => {
+    const flattened = arrays.flat();
+    return Array.from(new Set(flattened));
+  },
+
+  // For your specific use case - merges two arrays and makes unique
+  mergeUnique: (arr1: any[], arr2: any[]) => {
+    return Array.from(new Set([...(arr1 ?? []), ...(arr2 ?? [])]));
+  },
+
+  // If you need to merge multiple sources
+  mergeAllUnique: (...arrays: any[][]) => {
+    return Array.from(new Set(arrays.flat()));
+  },
+
+  // --- slicing ---
+  slice: (arr: any[], start?: number, end?: number) =>
+    arr?.slice(start, end) ?? [],
+
+  take: (arr: any[], n: number) => arr?.slice(0, n) ?? [],
+  drop: (arr: any[], n: number) => arr?.slice(n) ?? [],
+
+  // --- combine ---
+  concat: (...arrs: any[][]) => arrs.flat(),
+  flatten: (arr: any[][]) => arr?.flat?.() ?? [],
+
+  // --- guards ---
+  isEmpty: (arr: any[]) => (arr?.length ?? 0) === 0,
+
+  excludeIntersection: (...arrays: any[][]): any[] => {
+    if (arrays.length === 0) return [];
+
+    const counts = new Map<any, number>();
+
+    for (const arr of arrays) {
+      for (const item of new Set(arr)) {
+        counts.set(item, (counts.get(item) ?? 0) + 1);
+      }
+    }
+
+    const total = arrays.length;
+
+    return [...counts.entries()]
+      .filter(([, count]) => count < total)
+      .map(([item]) => item);
+  },
+};
+
+export const mathLib = {
+  add: (a: number, b: number) => a + b,
+  sub: (a: number, b: number) => a - b,
+  mul: (a: number, b: number) => a * b,
+  div: (a: number, b: number) => a / b,
+  neg: (n: number) => -n,
+
+  mod: (a: number, b: number) => a % b,
+  abs: (n: number) => Math.abs(n),
+
+  min: (...nums: number[]) => Math.min(...nums),
+  max: (...nums: number[]) => Math.max(...nums),
+
+  round: (n: number) => Math.round(n),
+  floor: (n: number) => Math.floor(n),
+  ceil: (n: number) => Math.ceil(n),
+
+  clamp: (n: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, n)),
+
+  sum: (arr: number[]) => arr.reduce((a, b) => a + b, 0),
+  avg: (arr: number[]) =>
+    arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0,
+};
+
+export const objectLib = {
+  get: (obj: any, key: string) => obj?.[key],
+
+  has: (obj: any, key: string) => key in (obj ?? {}),
+
+  keys: (obj: any) => Object.keys(obj ?? {}),
+  values: (obj: any) => Object.values(obj ?? {}),
+  entries: (obj: any) => Object.entries(obj ?? {}),
+
+  fromEntries: (entries: [string, any][]) => Object.fromEntries(entries),
+
+  assign: (...objs: any[]) => Object.assign({}, ...objs),
+
+  merge: (...objs: Record<string, any>[]) => {
+    const out: Record<string, any> = {};
+    for (const o of objs) {
+      if (o && typeof o === "object") Object.assign(out, o);
+    }
+    return out;
+  },
+
+  pick: (obj: Record<string, any>, keys: string[]) => {
+    const out: any = {};
+    for (const k of keys) if (k in obj) out[k] = obj[k];
+    return out;
+  },
+
+  omit: (obj: Record<string, any>, keys: string[]) => {
+    const out = { ...obj };
+    for (const k of keys) delete out[k];
+    return out;
+  },
+
+  setIfPresent: (key: string, value: any | null | undefined) => {
+    return value == null ? {} : { [key]: value };
+  },
+
+  setAtPath: (obj: any, path: string, value: any): void => {
+    const keys = path.split(".");
+    const lastKey = keys.pop();
+
+    const target = keys.reduce((acc, key) => {
+      const match = key.match(/^(\w+)\[(\d+)\]$/);
+      if (match) {
+        const [, arrKey, index] = match;
+        if (!acc[arrKey]) acc[arrKey] = [];
+        if (!acc[arrKey][Number(index)]) acc[arrKey][Number(index)] = {};
+        return acc[arrKey][Number(index)];
+      }
+
+      if (!acc[key]) acc[key] = {};
+      return acc[key];
+    }, obj);
+
+    if (!lastKey) return;
+
+    const match = lastKey.match(/^(\w+)\[(\d+)\]$/);
+    if (match) {
+      const [, arrKey, index] = match;
+      if (!target[arrKey]) target[arrKey] = [];
+      target[arrKey][Number(index)] = value;
+    } else {
+      target[lastKey] = value;
+    }
+  },
+};
+
+export const logicLib = {
+  and: (...vals: any[]) => vals.every(Boolean),
+  or: (...vals: any[]) => vals.some(Boolean),
+  not: (v: any) => !v,
+
+  eq: (a: any, b: any) => a === b,
+  neq: (a: any, b: any) => a !== b,
+
+  gt: (a: any, b: any) => a > b,
+  gte: (a: any, b: any) => a >= b,
+  lt: (a: any, b: any) => a < b,
+  lte: (a: any, b: any) => a <= b,
+};
+
+// good for workflows
+export const miscLib = {
+  identity: <T>(v: T) => v,
+
+  isNil: (v: any) => v == null,
+  isNumber: (v: any) => typeof v === "number",
+  isString: (v: any) => typeof v === "string",
+  isArray: (v: any) => Array.isArray(v),
+
+  toNumber: (v: any) => Number(v),
+  toString: (v: any) => String(v),
+};

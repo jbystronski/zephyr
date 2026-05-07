@@ -1,32 +1,40 @@
 // /tests/engine/parallel.test.ts
 
 import { describe, it, expect } from "vitest";
-import { createWorkflow } from "../../src/workflow-composer";
-import { runWorkflow } from "../utils";
-import { useLog } from "../../src";
+
+import { createModuleFactory, createRuntimeRoot } from "../../src";
+import { registryA } from "../utils";
 
 const calls: string[] = [];
 
-const registry = {
-  a: () => calls.push("A"),
-  b: () => calls.push("B"),
-  c: () => calls.push("C"),
-  noop: () => {},
+const local = {
+  actions: {
+    a: () => calls.push("A"),
+    b: () => calls.push("B"),
+    c: () => calls.push("C"),
+    noop: () => {},
+  },
 };
 
 describe("Parallel execution", () => {
   it("should execute all branches", async () => {
     calls.length = 0;
 
-    const wf = createWorkflow()("parallel-test")
-      .parallel(
-        (b) => b.seq("a", "a"),
-        (b) => b.seq("b", "b"),
-        (b) => b.seq("c", "c"),
-      )
-      .join("j");
+    const mod = createModuleFactory<typeof local>()({
+      define: ({ wf }) => ({
+        test: wf("parllel-test")
+          .parallel(
+            (b) => b.seq("a", "actions", "a"),
+            (b) => b.seq("b", "actions", "b"),
+            (b) => b.seq("c", "actions", "c"),
+          )
+          .join()
+          .build(),
+      }),
+    });
 
-    await runWorkflow({ workflow: wf, registry, observers: [] });
+    const rt = createRuntimeRoot({ module: mod, services: { ...local } });
+    await rt.run("test", {});
 
     expect(calls.sort()).toEqual(["A", "B", "C"]);
   });

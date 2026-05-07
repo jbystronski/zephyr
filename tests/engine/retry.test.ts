@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { createModuleFactory } from "../../src/workflow-module";
+import {
+  createModuleFactory,
+  createRuntimeRoot,
+} from "../../src/workflow-module";
 import { registryA } from "../utils";
 import { useLog } from "../../src";
 
@@ -22,20 +25,21 @@ describe("Retry handling at action level", () => {
       },
     };
 
-    const createMod = createModuleFactory<{}>();
+    const createMod = createModuleFactory<{ actions: typeof actions }>();
 
     // Child workflow with retry on the action itself
     const child = createMod({
-      actionRegistry: actions,
       define: ({ wf }) => {
         const failStep = wf<{ a: number; b: number }>("failStep")
+          .init("failInit")
           .seq(
             "subAdd",
+            "actions",
             "subAdd",
-            (ctx) => ctx.args(ctx.input.a, ctx.input.b),
+            (ctx) => ctx.args(ctx.get("failInit").a, ctx.get("failInit").b),
             { retry: 4 }, // <--- retry on the action itself
           )
-          .output((ctx) => ctx.results.subAdd);
+          .output((ctx) => ctx.get("subAdd"));
 
         return { failStep };
       },
@@ -43,28 +47,30 @@ describe("Retry handling at action level", () => {
 
     // Parent workflow
     const parent = createMod({
-      actionRegistry: actions,
       use: { child },
       define: ({ wf }) => {
         const test = wf<{ x: number; y: number }>("test")
+          .init("test_init")
           .seq(
             "a",
+            "actions",
             "add",
-            (ctx) => ctx.args(ctx.input.x, ctx.input.y),
+            (ctx) => ctx.args(ctx.get("test_init").x, ctx.get("test_init").y),
             { retry: 3 }, // retry on the parent action
           )
           .subflow("b", "child.failStep", (ctx) => ({
-            a: ctx.results.a,
+            a: ctx.get("a"),
             b: 10,
           }))
-          .output((ctx) => ({ a: ctx.results.a, b: ctx.results.b }));
+          .output((ctx) => ({ a: ctx.get("a"), b: ctx.get("b") }));
 
         return { test };
       },
     });
 
-    const rt = parent.createRuntime({ services: {} });
-    const res = await rt.run("test", { x: 1, y: 2 }, [useLog()]);
+    const r0 = createRuntimeRoot({ module: parent, services: { actions } });
+
+    const res = await r0.run("test", { x: 1, y: 2 }, [useLog()]);
 
     // ✅ Verify retry counts
     expect(retriesA).toBe(2); // retried once

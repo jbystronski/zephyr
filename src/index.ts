@@ -1,10 +1,24 @@
 export * from "./event-stream.js";
-export * from "./registry.js";
-export * from "./workflow-executor.js";
+
 export * from "./workflow-composer.js";
 export * from "./workflow-module.js";
 
-export { exposeAll, exposeAllAs } from "./utils.js";
+export {
+  exposeAll,
+  exposeAllAs,
+  createServices,
+  baseServices,
+} from "./utils.js";
+export {
+  stdLib,
+  dateLib,
+  stringLib,
+  arrayLib,
+  mathLib,
+  objectLib,
+  logicLib,
+  miscLib,
+} from "./services.js";
 export * from "./types.js";
-export * from "./session.js";
+
 export { useMetrics, useLog } from "./observer.js";
