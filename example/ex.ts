@@ -421,6 +421,14 @@ const modC = mod({
       .output(({ get }) => ({
         found: get("find").found,
       })),
+
+    testArray: wf("test array")
+      .seq("get arr", "std", "const", (_) =>
+        _.args({
+          products: [{ name: "first" }, { name: "second" }],
+        }),
+      )
+      .output((_) => _.get("get arr")),
   }),
 });
 
@@ -445,21 +453,25 @@ const modCruntime = createRuntimeRoot({
 //   ],
 // });
 
-const testTwo = await modCruntime.run(
-  "createObjectsAndFind",
-  {
-    initData: [
-      { kind: "bucket", label: "emails" },
-      { kind: "bucket", label: "configs" },
-    ],
-    keyToFind: "emails",
-  },
-  [useLog()],
-);
+// const testTwo = await modCruntime.run(
+//   "createObjectsAndFind",
+//   {
+//     initData: [
+//       { kind: "bucket", label: "emails" },
+//       { kind: "bucket", label: "configs" },
+//     ],
+//     keyToFind: "emails",
+//   },
+//   [useLog()],
+// );
 
-console.dir(modC.__public.createObjectsAndFind, { depth: 16 });
+console.dir(modC.__public.testArray, { depth: 16 });
 
-console.log(testTwo.output);
+const r = await modCruntime.run("testArray", {}, [useLog()]);
+
+console.log("r", r);
+
+// console.log(testTwo.output);
 
 // console.dir(modC.workflows.testNewIfElse, { depth: 16 });
 //

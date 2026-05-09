@@ -169,6 +169,18 @@ export const dateLib = {
     return dateLib.convert(inMs, to);
   },
 
+  durationFromNow: (
+    futureDate: Date,
+    unit: "ms" | "seconds" | "minutes" | "hours" | "days",
+  ): number => {
+    const now = new Date();
+    const diffMs = futureDate.getTime() - now.getTime();
+    return dateLib.convert(diffMs, unit);
+  },
+
+  isDateExpired: (dateString: string) =>
+    new Date(dateString).getTime() < Date.now(),
+
   add: (
     d: Date,
     opts: {
@@ -225,6 +237,9 @@ export const dateLib = {
 };
 
 export const stringLib = {
+  isEmail: (str: string): boolean => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str);
+  },
   lower: (s: string) => s.toLowerCase(),
   upper: (s: string) => s.toUpperCase(),
   trim: (s: string) => s.trim(),
@@ -245,6 +260,29 @@ export const stringLib = {
 };
 
 export const arrayLib = {
+  isOneOf: (allowedValues: readonly any[], value: unknown) => {
+    return allowedValues.includes(value);
+  },
+  hasMax: (arr: any[], max: number): boolean => {
+    if (!Array.isArray(arr)) return false;
+    return arr.length <= max;
+  },
+
+  hasMin: (arr: any[], min: number): boolean => {
+    if (!Array.isArray(arr)) return false;
+    return arr.length >= min;
+  },
+
+  allEqual: (values: readonly any[]): boolean => {
+    if (values.length === 0) return true;
+    const firstType = typeof values[0];
+    const firstValue = values[0];
+
+    if (!values.every((v) => typeof v === firstType)) return false;
+
+    return values.every((v) => v === firstValue);
+  },
+
   length: (arr: any[]) => arr?.length ?? 0,
 
   // --- access ---
@@ -448,4 +486,72 @@ export const miscLib = {
 
   toNumber: (v: any) => Number(v),
   toString: (v: any) => String(v),
+};
+
+export const extendedJsonLib = {
+  oid: (
+    value: string | string[],
+    fallback: any = null,
+  ): { $oid: string } | { $oid: string }[] => {
+    if (!value || (typeof value === "string" && value.trim() === ""))
+      return fallback;
+
+    if (Array.isArray(value)) {
+      if (!value.length) return [];
+
+      return value.map((v) => ({
+        $oid: v,
+      }));
+    }
+
+    return { $oid: value };
+  },
+
+  numberDecimal: (value: any | any[], fallback: string | number = 0) => {
+    if (Array.isArray(value)) {
+      if (!value.length) return [];
+
+      return value.map((v) => ({
+        $numberDecimal: v ?? fallback,
+      }));
+    }
+
+    return { $numberDecimal: value ?? fallback };
+  },
+
+  numberInt: (value: any | any[], fallback: string | number = 0) => {
+    if (Array.isArray(value)) {
+      if (!value.length) return [];
+
+      return value.map((v) => ({
+        $numberInt: v ?? fallback,
+      }));
+    }
+
+    return { $numberInt: value ?? fallback };
+  },
+
+  numberLong: (value: any | any[], fallback: string | number = 0) => {
+    if (Array.isArray(value)) {
+      if (!value.length) return [];
+
+      return value.map((v) => ({
+        $numberLong: v ?? fallback,
+      }));
+    }
+
+    return { $numberLong: value ?? fallback };
+  },
+
+  date: (value: any | any[], fallback?: any) => {
+    if (Array.isArray(value)) {
+      if (!value.length) return [];
+
+      return value.map((v) => ({
+        $date: v ?? fallback,
+      }));
+    }
+
+    return { $date: value ?? fallback };
+  },
 };

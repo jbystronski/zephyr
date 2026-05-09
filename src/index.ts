@@ -18,6 +18,7 @@ export {
   objectLib,
   logicLib,
   miscLib,
+  extendedJsonLib,
 } from "./services.js";
 export * from "./types.js";
 
