@@ -1,6 +1,7 @@
 import {
   arrayLib,
   dateLib,
+  errLib,
   extendedJsonLib,
   logicLib,
   mathLib,
@@ -93,4 +94,5 @@ export const baseServices = createServices()
   .add("object_std", objectLib)
   .add("logic_std", logicLib)
   .add("misc_std", miscLib)
-  .add("extended_json_std", extendedJsonLib);
+  .add("extended_json_std", extendedJsonLib)
+  .add("err_std", errLib);

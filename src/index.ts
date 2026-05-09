@@ -19,6 +19,7 @@ export {
   logicLib,
   miscLib,
   extendedJsonLib,
+  errLib,
 } from "./services.js";
 export * from "./types.js";
 

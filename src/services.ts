@@ -555,3 +555,9 @@ export const extendedJsonLib = {
     return { $date: value ?? fallback };
   },
 };
+
+export const errLib = {
+  fatal: (...msgParts: any[]) => {
+    throw new Error(msgParts.join(""));
+  },
+};

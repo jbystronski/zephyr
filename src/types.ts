@@ -1,6 +1,7 @@
 import {
   arrayLib,
   dateLib,
+  errLib,
   extendedJsonLib,
   logicLib,
   mathLib,
@@ -54,6 +55,7 @@ export type StandardServices = {
   logic_std: typeof logicLib;
   misc_std: typeof miscLib;
   extended_json_std: typeof extendedJsonLib;
+  err_std: typeof errLib;
 };
 
 export type ServiceParams<
