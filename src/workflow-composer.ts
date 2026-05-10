@@ -450,9 +450,9 @@ export class WorkflowBuilder<
   subflow<Prefix extends string, K extends keyof Config["wfReg"] & string>(
     prefix: Prefix,
     workflowKey: K,
-    resolveInput?: (ctx: {
-      get<K extends keyof Results>(key: K): Results[K];
-    }) => WorkflowInput<Config["wfReg"][K]>,
+    resolve?: (
+      ctx: ExprCtx<Config["services"], Results>,
+    ) => WorkflowInput<Config["wfReg"][K]>,
   ): WorkflowBuilder<
     Config,
     Steps,
@@ -469,17 +469,13 @@ export class WorkflowBuilder<
     if (!subWf) {
       throw new Error(`Subflow not found: ${workflowKey}`);
     }
-
-    const inputAst = toNode(
-      resolveInput?.({
-        get: ((k: string) => createGetter(this.idToIdx[k] ?? this.idx)) as any,
-      }),
-    );
+    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : [];
+    const ast = toNode(expr);
 
     const { wf, maxIdx, outputIdx } = remapWorkflowInstance(
       subWf,
       prefix,
-      inputAst,
+      ast,
       this.frontier,
       this.idx,
     );
