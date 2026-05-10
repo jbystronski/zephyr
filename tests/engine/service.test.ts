@@ -22,7 +22,7 @@ const createMod = createModuleFactory<PayService>();
 const subchild = createMod({
   define: ({ wf }) => ({
     loc: wf("loc")
-      .seq("a", "actions", "add", (ctx) => ctx.args(2, 2))
+      .seq("a", (ctx) => ctx.actions.add(2, 2))
       .output((ctx) => ctx.get("a")),
   }),
 });
@@ -32,9 +32,7 @@ const child = createMod({
   define: ({ wf }) => {
     const pay = wf<{ amount: number }>("payment")
       .init("pay_init")
-      .seq("payment", "stripe", "charge", (ctx) =>
-        ctx.args(ctx.get("pay_init").amount),
-      )
+      .seq("payment", (ctx) => ctx.stripe.charge(ctx.get("pay_init").amount))
 
       .output((ctx) => ctx.get("payment"));
 
@@ -49,13 +47,13 @@ const parent = createModuleFactory<PayService>()({
       use: { child },
       define: ({ wf }) => ({
         st: wf("st")
-          .seq("st", "stripe", "charge", (ctx) => ctx.args(333))
+          .seq("st", (ctx) => ctx.stripe.charge(333))
           .build(),
         localOne: wf<{ input: boolean }>("macro_1")
-          .seq("add", "actions", "add", (ctx) => ctx.args(2, 3))
+          .seq("add", (ctx) => ctx.actions.add(2, 3))
           .output((ctx) => ctx.get("add")),
         localTwo: wf("macro_2")
-          .seq("add", "actions", "add", (ctx) => ctx.args(2, 3))
+          .seq("add", (ctx) => ctx.actions.add(2, 3))
           .output((ctx) => ctx.get("add")),
       }),
     }),
@@ -63,16 +61,12 @@ const parent = createModuleFactory<PayService>()({
   expose: { macroOne: "local.localOne", ...exposeAllAs("child", child) },
   define: ({ wf }) => {
     const test = wf("test")
-      .seq("sum_test", "actions", "add", (ctx) => ctx.args(2, 3))
-
       .subflow("macro", "local.localTwo", (ctx) => ({}))
       .subflow("result", "child.pay", (ctx) => ({
         amount: 400,
       }))
 
-      .seq("sum_2_test", "actions", "add", (ctx) =>
-        ctx.args(ctx.get("sum_test"), 10),
-      )
+      .seq("sum_2_test", (ctx) => ctx.actions.add(ctx.actions.add(2, 3), 10))
       .output((ctx) => ctx.get("result"));
 
     return { test };

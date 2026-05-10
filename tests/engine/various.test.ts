@@ -24,11 +24,11 @@ const modB = mod({
       "create explorer object",
     )
       .init("i")
-      .seq("type of object", "std", "if", ({ args, get }) =>
-        args(get("i").parent, "branch", "root"),
+      .seq("type of object", ({ std, get }) =>
+        std.if(get("i").parent, "branch", "root"),
       )
-      .seq("created", "std", "const", ({ args, get }) =>
-        args({
+      .seq("created", ({ std, get }) =>
+        std.const({
           label: get("i").key,
           parent: get("i").parent,
           type: get("type of object"),
@@ -45,7 +45,7 @@ const modB = mod({
       .init("i")
       .if(
         "has key",
-        ({ truthy, get }) => truthy(get("i").key),
+        ({ logic_std: { truthy }, get }) => truthy(get("i").key),
         (b) =>
           b.pipe(
             "find pipe",
@@ -54,7 +54,7 @@ const modB = mod({
             (b) =>
               b
                 .init("item")
-                .eval("match label", ({ get, eq }) =>
+                .seq("match label", ({ get, logic_std: { eq } }) =>
                   eq(get("i").key, get("item").label),
                 ),
           ),

@@ -20,9 +20,7 @@ const deepChildSecond = createMod({
   define: ({ wf }) => ({
     deepChildActionSecond: wf<{ init: string }>("deepChildActionSecond")
       .init("init")
-      .seq("actionSecond", "actions", "uppercase", (ctx) =>
-        ctx.args(ctx.get("init").init),
-      )
+      .seq("actionSecond", (ctx) => ctx.actions.uppercase(ctx.get("init").init))
       .output((ctx) => ({ deepRes: ctx.get("actionSecond") })),
   }),
 });
@@ -31,9 +29,7 @@ const deepChild = createMod({
   define: ({ wf }) => ({
     deepChildAction: wf<{ init: string }>("deepChildAction")
       .init("d2_init")
-      .seq("action", "actions", "uppercase", (ctx) =>
-        ctx.args(ctx.get("d2_init").init),
-      )
+      .seq("action", (ctx) => ctx.actions.uppercase(ctx.get("d2_init").init))
       .output((ctx) => ({ deepRes: ctx.get("action") })),
   }),
 });
@@ -44,10 +40,10 @@ const child = createMod({
   define: ({ wf }) => ({
     sum: wf<{ a: number; b: number }>("sum")
       .init("d3_init")
-      .seq("add", "actions", "add", (ctx) =>
-        ctx.args(ctx.get("d3_init").a, ctx.get("d3_init").b),
+      .seq("add", (ctx) =>
+        ctx.actions.add(ctx.get("d3_init").a, ctx.get("d3_init").b),
       )
-      .seq("payment", "stripe", "charge", (ctx) => ctx.args(444))
+      .seq("payment", (ctx) => ctx.stripe.charge(444))
 
       .output((ctx) => ctx.get("add")),
   }),

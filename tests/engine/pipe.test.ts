@@ -6,9 +6,8 @@ import {
   createRuntimeRoot,
 } from "../../src/workflow-module";
 import { registryA } from "../utils";
-import { useLog } from "../../src";
+import { baseServices, StandardServices, useLog } from "../../src";
 type S1 = {
-  enrich: (input: string, add: string) => string;
   addAnimal: (input: { initArray: string[]; newAnimal: string }) => string[];
 };
 
@@ -62,10 +61,11 @@ const transformables: Transformable[] = [
   },
 ];
 
-const createMod = createModuleFactory<{
-  s1: S1;
-  actions: (typeof registryA)["actions"];
-}>();
+const createMod = createModuleFactory<
+  StandardServices & {
+    s1: S1;
+  }
+>();
 
 const testPipe = createMod({
   define: ({ wf }) => {
@@ -80,7 +80,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .eval("first", ({ get, and, eq }) =>
+            .seq("first", ({ get, logic_std: { and, eq } }) =>
               and(
                 eq(get("animal").kind, "bird"),
                 eq(get("animal").climate, "arctic"),
@@ -98,7 +98,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .eval("first", ({ get, and, eq }) =>
+            .seq("first", ({ get, logic_std: { and, eq } }) =>
               and(eq(get("animal").climate, "tropical")),
             ),
       )
@@ -113,7 +113,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .eval("first", ({ get, and, eq }) =>
+            .seq("first", ({ get, logic_std: { and, eq } }) =>
               and(eq(get("animal").climate, "arctic")),
             ),
       )
@@ -128,7 +128,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .eval("first", ({ get, and, eq }) =>
+            .seq("first", ({ get, logic_std: { and, eq } }) =>
               and(eq(get("animal").kind, "reptile")),
             ),
       )
@@ -136,8 +136,8 @@ const testPipe = createMod({
 
     const test = wf<{ elements: string[]; another: string }>("pipeElements")
       .init("init")
-      .seq("add_animal", "s1", "addAnimal", (ctx) =>
-        ctx.args({
+      .seq("add_animal", (ctx) =>
+        ctx.s1.addAnimal({
           initArray: ctx.get("init").elements,
           newAnimal: ctx.get("init").another,
         }),
@@ -150,17 +150,13 @@ const testPipe = createMod({
         (b) =>
           b
             .init("pv2_init")
-            .seq("upp", "actions", "uppercase", (ctx) =>
-              ctx.args(ctx.get("pv2_init")),
+            .seq("upp", (ctx) => ctx.string_std.upper(ctx.get("pv2_init")))
+            .seq("pref", ({ std: { concat }, get }) => concat("<", get("upp")))
+            .seq("suffix", ({ std: { concat }, get }) =>
+              concat(get("pref"), ">"),
             )
-            .seq("pref", "actions", "addPrefix", ({ args, get }) =>
-              args(get("upp"), "<"),
-            )
-            .seq("suffix", "actions", "addSuffix", ({ args, get }) =>
-              args(get("pref"), ">"),
-            )
-            .seq("enrich", "s1", "enrich", ({ args, get }) =>
-              args(get("suffix"), "!"),
+            .seq("enrich", ({ std: { concat }, get }) =>
+              concat(get("suffix"), "!"),
             ),
       )
 
@@ -176,18 +172,19 @@ const testPipe = createMod({
   },
 });
 
+const s = baseServices
+  .add("s1", {
+    addAnimal: (input: { initArray: string[]; newAnimal: string }) => {
+      const newArr = [...input.initArray, input.newAnimal];
+      return newArr;
+    },
+  })
+
+  .build();
+
 const r0 = createRuntimeRoot({
   module: testPipe,
-  services: {
-    ...registryA,
-    s1: {
-      enrich: (input: string, add: string) => input + add,
-      addAnimal: (input: { initArray: string[]; newAnimal: string }) => {
-        const newArr = [...input.initArray, input.newAnimal];
-        return newArr;
-      },
-    },
-  },
+  services: s,
 });
 
 describe("Pipe", () => {

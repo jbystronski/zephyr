@@ -1,19 +1,112 @@
-export type ArgNode =
-  | { type: "const"; value: any }
-  | { type: "get"; ref: number; path: (string | symbol)[] };
+import { ServiceRegistry } from "./types.js";
 
-export type ConditionNode =
-  | { type: "eq"; left: ArgNode; right: ArgNode }
-  | { type: "neq"; left: ArgNode; right: ArgNode }
-  | { type: "gt"; left: ArgNode; right: ArgNode }
-  | { type: "gte"; left: ArgNode; right: ArgNode }
-  | { type: "lt"; left: ArgNode; right: ArgNode }
-  | { type: "lte"; left: ArgNode; right: ArgNode }
-  | { type: "and"; conditions: ConditionNode[] }
-  | { type: "or"; conditions: ConditionNode[] }
-  | { type: "not"; condition: ConditionNode }
-  | { type: "truthy"; value: ArgNode }
-  | { type: "falsy"; value: ArgNode };
+export type ExprNode =
+  | {
+      type: "const";
+      value: any;
+    }
+  | {
+      type: "get";
+      ref: number;
+      path: (string | symbol)[];
+    }
+  | {
+      type: "call";
+      service: string;
+      method: string;
+      args: ExprNode[];
+    };
+
+// export type ExprServiceCtx<S extends ServiceRegistry> = {
+//   [SK in keyof S]: {
+//     [MK in keyof S[SK]]: (...args: Parameters<S[SK][MK]>) => ExprNode;
+//   };
+// };
+
+export type ExprServiceCtx<S extends ServiceRegistry> = {
+  [SK in keyof S]: {
+    [MK in keyof S[SK]]: (
+      ...args: Parameters<S[SK][MK]>
+    ) => ExprValue<Awaited<ReturnType<S[SK][MK]>>>;
+  };
+};
+
+export type ExprCtx<S extends ServiceRegistry, Results> = ExprServiceCtx<S> & {
+  get<K extends keyof Results>(key: K): Results[K];
+};
+
+export type ExprValue<T> = T & {
+  __node: ExprNode;
+};
+
+export type GetterProxy<T> = T & {
+  __node: ExprNode;
+};
+
+export function createExprCtx(idToIdx: Record<string, number>): any {
+  const root: any = {};
+
+  root.get = (key: string) => {
+    const idx = idToIdx[key];
+
+    if (idx === undefined) {
+      throw new Error(`Unknown ref "${key}"`);
+    }
+
+    return createGetter(idx);
+  };
+
+  return new Proxy(root, {
+    get(_, service) {
+      if (service === "get") {
+        return root.get;
+      }
+
+      return new Proxy(
+        {},
+        {
+          get(_, method) {
+            return (...args: any[]) => ({
+              __node: {
+                type: "call",
+                service,
+                method,
+                args: args.map(toNode),
+              },
+            });
+          },
+        },
+      );
+    },
+  });
+}
+
+export function toNode(v: any): ExprNode {
+  if (v && typeof v === "object" && "__node" in v) {
+    return v.__node;
+  }
+
+  if (Array.isArray(v)) {
+    return {
+      type: "const",
+      value: v.map(toNode),
+    };
+  }
+
+  if (v && typeof v === "object") {
+    return {
+      type: "const",
+      value: Object.fromEntries(
+        Object.entries(v).map(([k, val]) => [k, toNode(val)]),
+      ),
+    };
+  }
+
+  return {
+    type: "const",
+    value: v,
+  };
+}
 
 export function createGetter(ref: number): any {
   const handler: ProxyHandler<any> = {
@@ -41,93 +134,6 @@ export function createGetter(ref: number): any {
   );
 }
 
-export function createWhenCtx(idToIdx: Record<string, number>) {
-  return {
-    get: ((key: string) => {
-      const idx = idToIdx[key];
-      // if (!idx) return createGetter(key);
-
-      if (idx === undefined) {
-        throw new Error(`Unresolved numeric index`);
-      }
-
-      return createGetter(idx);
-    }) as any,
-
-    eq: (a: any, b: any): ConditionNode => ({
-      type: "eq",
-      left: toNode(a),
-      right: toNode(b),
-    }),
-
-    neq: (a: any, b: any): ConditionNode => ({
-      type: "neq",
-      left: toNode(a),
-      right: toNode(b),
-    }),
-
-    gt: (a: any, b: any) => ({ type: "gt", left: toNode(a), right: toNode(b) }),
-    gte: (a: any, b: any) => ({
-      type: "gte",
-      left: toNode(a),
-      right: toNode(b),
-    }),
-    lt: (a: any, b: any) => ({ type: "lt", left: toNode(a), right: toNode(b) }),
-    lte: (a: any, b: any) => ({
-      type: "lte",
-      left: toNode(a),
-      right: toNode(b),
-    }),
-
-    and: (...conds: any) => ({ type: "and", conditions: conds }),
-    or: (...conds: any) => ({ type: "or", conditions: conds }),
-    not: (cond: any) => ({ type: "not", condition: cond }),
-
-    truthy: (v: any) => ({ type: "truthy", value: toNode(v) }),
-    falsy: (v: any) => ({ type: "falsy", value: toNode(v) }),
-  };
-}
-
-export function createOutputCtx(idToIdx: Record<string, number>) {
-  return {
-    get: ((key: string) => {
-      const idx = idToIdx[key];
-
-      if (idx === undefined) {
-        throw new Error(
-          `[output] Unknown ref "${key}". Must reference a defined step id.`,
-        );
-      }
-
-      return createGetter(idx);
-    }) as any,
-  };
-}
-
-export function toNode(v: any): ArgNode {
-  if (v && typeof v === "object" && "__node" in v) {
-    return v.__node;
-  }
-
-  if (Array.isArray(v)) {
-    return {
-      type: "const",
-      value: v.map(toNode),
-    };
-  }
-
-  if (v && typeof v === "object") {
-    return {
-      type: "const",
-      value: Object.fromEntries(
-        Object.entries(v).map(([k, val]) => [k, toNode(val)]),
-      ),
-    };
-  }
-
-  return { type: "const", value: v };
-}
-
 export function remapWorkflowInstance(
   subWf: any,
   prefix: string,
@@ -143,7 +149,7 @@ export function remapWorkflowInstance(
   const initStep = wf.steps.find((s: any) => s.idx === initIdx);
 
   if (initStep) {
-    initStep.resolve = [inputAst];
+    initStep.resolve = inputAst;
     initStep.dependsOn = parentFrontier.length ? [...parentFrontier] : [];
   }
 

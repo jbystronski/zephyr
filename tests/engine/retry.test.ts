@@ -34,9 +34,9 @@ describe("Retry handling at action level", () => {
           .init("failInit")
           .seq(
             "subAdd",
-            "actions",
-            "subAdd",
-            (ctx) => ctx.args(ctx.get("failInit").a, ctx.get("failInit").b),
+
+            (ctx) =>
+              ctx.actions.subAdd(ctx.get("failInit").a, ctx.get("failInit").b),
             { retry: 4 }, // <--- retry on the action itself
           )
           .output((ctx) => ctx.get("subAdd"));
@@ -53,9 +53,9 @@ describe("Retry handling at action level", () => {
           .init("test_init")
           .seq(
             "a",
-            "actions",
-            "add",
-            (ctx) => ctx.args(ctx.get("test_init").x, ctx.get("test_init").y),
+
+            (ctx) =>
+              ctx.actions.add(ctx.get("test_init").x, ctx.get("test_init").y),
             { retry: 3 }, // retry on the parent action
           )
           .subflow("b", "child.failStep", (ctx) => ({

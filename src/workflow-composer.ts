@@ -1,18 +1,12 @@
 import {
-  ArgNode,
-  ConditionNode,
+  createExprCtx,
   createGetter,
-  createOutputCtx,
-  createWhenCtx,
+  ExprCtx,
+  ExprNode,
   remapWorkflowInstance,
   toNode,
 } from "./ast.js";
-import {
-  ServiceParams,
-  ServiceRegistry,
-  ServiceReturn,
-  Simplify,
-} from "./types.js";
+import { ServiceRegistry, Simplify } from "./types.js";
 import { generateWorkflowId } from "./utils.js";
 
 type WorkflowInput<T> =
@@ -28,27 +22,9 @@ type WorkflowOutput<T> =
       : O
     : undefined;
 
-type ConditionResolveCtx<Results> = {
-  get<K extends keyof Results>(key: K): Results[K];
-  eq: (a: any, b: any) => ConditionNode;
-  neq: (a: any, b: any) => ConditionNode;
-
-  gt: (a: any, b: any) => ConditionNode;
-  gte: (a: any, b: any) => ConditionNode;
-  lt: (a: any, b: any) => ConditionNode;
-  lte: (a: any, b: any) => ConditionNode;
-
-  and: (...conds: ConditionNode[]) => ConditionNode;
-  or: (...conds: ConditionNode[]) => ConditionNode;
-  not: (cond: ConditionNode) => ConditionNode;
-
-  truthy: (v: any) => ConditionNode;
-  falsy: (v: any) => ConditionNode;
-};
-
 export type PipeNode = {
   type: "pipe";
-  input: ArgNode;
+  input: ExprNode;
   mode: PipeMode;
 
   workflow: {
@@ -71,6 +47,13 @@ export type PipeNode = {
   exitMap: number[];
 };
 
+export type StepSpec =
+  | "__init__"
+  | "__eval__"
+  | "__out__"
+  | "__pipe__"
+  | "__join__";
+
 export type WFConfig<Input, Services, WFReg> = {
   input: Input;
   services: Services;
@@ -80,16 +63,12 @@ export type WFConfig<Input, Services, WFReg> = {
 export type StepDef<ID extends string = string> = {
   id: ID;
   idx: number;
-
-  service?: string;
-  method: string;
   dependsOn: number[];
   guards?: number[];
-  resolve?: ArgNode[];
-  eval?: ConditionNode;
+  resolve: ExprNode | null;
 
   options?: StepOptions<any>;
-
+  spec?: StepSpec;
   pipe?: PipeNode;
 };
 
@@ -207,9 +186,9 @@ export class WorkflowBuilder<
     this.steps.push({
       id,
       idx: this.idx,
-      method: "__init__",
+      spec: "__init__",
       guards: [...(this.guards ?? [])],
-      resolve: [],
+      resolve: null,
       dependsOn: [],
     });
 
@@ -227,24 +206,10 @@ export class WorkflowBuilder<
     >;
   }
 
-  seq<
-    ID extends string,
-    SK extends keyof Config["services"] & string,
-    MK extends keyof Config["services"][SK] & string,
-  >(
+  seq<ID extends string, R>(
     id: ID,
-    service: SK,
-    method: MK,
 
-    resolve?: (
-      ctx: {
-        get<K extends keyof Results>(key: K): Results[K];
-      } & {
-        args: <T extends ServiceParams<Config["services"], SK, MK>>(
-          ...args: T
-        ) => T;
-      },
-    ) => ServiceParams<Config["services"], SK, MK>,
+    resolve?: (ctx: ExprCtx<Config["services"], Results>) => R,
 
     options?: StepOptions<Results>,
   ): WorkflowBuilder<
@@ -252,7 +217,7 @@ export class WorkflowBuilder<
     [...Steps, StepDef<ID>],
     Simplify<
       Results & {
-        [K in ID]: ServiceReturn<Config["services"], SK, MK>;
+        [K in ID]: Awaited<R>;
       }
     >,
     ID
@@ -260,63 +225,17 @@ export class WorkflowBuilder<
     const deps = [...this.frontier];
 
     this.idToIdx[id] = this.idx;
-    const astArgs: ArgNode[] = resolve
-      ? resolve({
-          get: ((key: string) =>
-            createGetter(this.idToIdx[key] ?? this.idx)) as any,
 
-          args: (...args: any[]) => args as any,
-        }).map(toNode)
-      : [];
+    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : [];
+    const ast = toNode(expr);
 
     this.steps.push({
       id,
       idx: this.idx,
-      method,
-      service,
-      resolve: astArgs,
+      resolve: ast,
       dependsOn: deps,
       guards: [...(this.guards ?? [])],
       options,
-    });
-
-    this.frontier = [this.idx];
-
-    this.idx += 1;
-    return this as any;
-  }
-
-  eval<ID extends string>(
-    id: ID,
-    resolve: (ctx: ConditionResolveCtx<Results>) => ConditionNode,
-  ): WorkflowBuilder<
-    Config,
-    [...Steps, StepDef<ID>],
-    Simplify<
-      Results & {
-        [K in ID]: boolean;
-      }
-    >,
-    ID
-  > {
-    const deps = [...this.frontier];
-
-    this.idToIdx[id] = this.idx;
-
-    const ast = resolve(createWhenCtx(this.idToIdx) as any);
-    // const astArgs: ArgNode[] = resolve
-    //   ? resolve({
-    //       get: ((key: string) => createGetter(key)) as any,
-    //     }).map(toNode)
-    //   : [];
-
-    this.steps.push({
-      id,
-      idx: this.idx,
-      method: "__eval__",
-      eval: ast,
-      dependsOn: deps,
-      guards: [...(this.guards ?? [])],
     });
 
     this.frontier = [this.idx];
@@ -338,8 +257,8 @@ export class WorkflowBuilder<
   >(
     id: ID,
     mode: Mode,
+    input: (ctx: ExprCtx<Config["services"], Results>) => Arr,
 
-    input: (ctx: { get<K extends keyof Results>(key: K): Results[K] }) => Arr,
     builder: (
       b: WorkflowBuilder<
         WFConfig<Arr[number], Config["services"], Config["wfReg"]>,
@@ -386,18 +305,22 @@ export class WorkflowBuilder<
     // const endSteps = built.steps.filter((s) => !hasDependents.has(s.uid));
 
     const endSteps = built.steps.filter(
-      (s) => s.method !== "__init__" && !hasDependents.has(s.idx),
+      (s) => s.spec !== "__init__" && !hasDependents.has(s.idx),
     );
 
-    const pipeInputAst = toNode(
-      input({
-        get: ((key: string) => {
-          const idx = this.idToIdx[key];
-          if (idx === undefined) throw new Error(`Unresolved idx`);
-          return createGetter(idx);
-        }) as any,
-      }),
-    );
+    // const pipeInputAst = toNode(
+    //   input({
+    //     get: ((key: string) => {
+    //       const idx = this.idToIdx[key];
+    //       if (idx === undefined) throw new Error(`Unresolved idx`);
+    //       return createGetter(idx);
+    //     }) as any,
+    //   }),
+    // );
+    //
+    const pipeExpr = input ? input(createExprCtx(this.idToIdx)) : [];
+
+    const pipeInputAst = toNode(pipeExpr);
 
     const subWf: WorkflowDef<any, any, any, any> = {
       _id: wfId,
@@ -423,11 +346,11 @@ export class WorkflowBuilder<
     this.steps.push({
       id,
       idx: this.idx,
-      method: "__pipe__",
+      spec: "__pipe__",
       dependsOn: deps,
       guards: [...(this.guards ?? [])],
 
-      resolve: [pipeInputAst],
+      resolve: pipeInputAst,
       pipe: {
         type: "pipe",
         mode,
@@ -511,8 +434,8 @@ export class WorkflowBuilder<
     this.steps.push({
       id: "__join__",
       idx: this.idx,
-      resolve: [],
-      method: "__join__",
+      resolve: null,
+      spec: "__join__",
       dependsOn: [...this.frontier],
       guards: [...(this.guards ?? [])],
     });
@@ -591,9 +514,9 @@ export class WorkflowBuilder<
   par = ((...args: Parameters<typeof this._parallel>) =>
     this._parallel(...args)) as this["parallel"];
 
-  if<ID extends string, Branch extends WorkflowBuilder<Config, any, any>>(
+  if<ID extends string, R, Branch extends WorkflowBuilder<Config, any, any>>(
     id: ID,
-    predicate: (ctx: ConditionResolveCtx<Results>) => ConditionNode,
+    resolve: (ctx: ExprCtx<Config["services"], Results>) => R,
 
     builder: (b: WorkflowBuilder<Config, [], Results>) => Branch,
   ): WorkflowBuilder<
@@ -609,20 +532,7 @@ export class WorkflowBuilder<
     any,
     Output
   > {
-    // const ast = predicate(createWhenCtx(this.idToIdx) as any);
-    // const deps = [...this.frontier];
-    //
-    // this.idToIdx[id] = this.idx;
-    // this.steps.push({
-    //   id,
-    //   idx: this.idx,
-    //   method: "__eval__",
-    //   eval: ast,
-    //   dependsOn: deps,
-    //   guards: [...(this.guards ?? [])],
-    // });
-
-    this.eval(id, predicate);
+    this.seq(id, resolve);
 
     const newGuardIdx = this.idx - 1;
 
@@ -654,119 +564,24 @@ export class WorkflowBuilder<
     return this as any;
   }
 
-  ifElse<
-    ID extends string,
-    IfBranch extends WorkflowBuilder<Config, any, any>,
-    ElseBranch extends WorkflowBuilder<Config, any, any>,
-  >(
-    id: ID,
-    predicate: (ctx: ConditionResolveCtx<Results>) => ConditionNode,
-    ifBuilder: (b: WorkflowBuilder<Config, [], Results>) => IfBranch,
-    elseBuilder: (b: WorkflowBuilder<Config, [], Results>) => ElseBranch,
-  ): WorkflowBuilder<
-    Config,
-    [
-      ...Steps,
-      ...(IfBranch extends WorkflowBuilder<any, infer S, any> ? S : []),
-      ...(ElseBranch extends WorkflowBuilder<any, infer S, any> ? S : []),
-    ],
-    Simplify<
-      Results &
-        (IfBranch extends WorkflowBuilder<any, any, infer R1>
-          ? Partial<R1>
-          : {}) &
-        (ElseBranch extends WorkflowBuilder<any, any, infer R2>
-          ? Partial<R2>
-          : {})
-    >,
-    any,
-    Output
-  > {
-    const cond = predicate(createWhenCtx(this.idToIdx) as any);
-
-    const guardIdx = this.idx;
-    this.eval(id, () => cond);
-
-    // IF branch
-    const ifB = new WorkflowBuilder<Config, [], Results>(
-      this.name,
-
-      this.wfRegistry,
-    );
-    ifB.frontier = [guardIdx];
-    ifB.guards = [...(this.guards ?? []), guardIdx];
-    ifB.idToIdx = { ...this.idToIdx };
-    ifB.idx = this.idx;
-
-    const builtIf = ifBuilder(ifB);
-
-    // ELSE branch (negated condition)
-
-    const elseIdx = builtIf.idx;
-
-    // const base = this.steps[guardIdx];
-    this.steps.push({
-      id: `${id}__else__`,
-      idx: elseIdx,
-      method: "__eval__",
-      eval: {
-        type: "not",
-        condition: JSON.parse(JSON.stringify(cond)),
-      },
-      dependsOn: [guardIdx],
-      guards: [...(this.guards ?? [])],
-    });
-
-    const elseB = new WorkflowBuilder<Config, [], Results>(
-      this.name,
-
-      this.wfRegistry,
-    );
-
-    elseB.frontier = [elseIdx];
-    elseB.guards = [...(this.guards ?? []), elseIdx];
-    elseB.idToIdx = { ...this.idToIdx };
-    elseB.idx = elseIdx + 1;
-
-    const builtElse = elseBuilder(elseB);
-
-    // merge
-    this.steps.push(...ifB.steps, ...elseB.steps);
-
-    this.idToIdx = {
-      ...this.idToIdx,
-      ...ifB.idToIdx,
-      ...elseB.idToIdx,
-    };
-
-    // both branches become frontier
-    this.frontier = [...ifB.frontier, ...elseB.frontier];
-    this.idx = builtElse.idx;
-    return this as any;
-  }
-
-  output<Output>(
-    fn: (ctx: { get<K extends keyof Results>(key: K): Results[K] }) => Output,
-  ): WorkflowDef<Config["input"], Results, Steps, Output> {
+  output<R>(
+    resolve: (ctx: ExprCtx<Config["services"], Results>) => R,
+  ): WorkflowDef<Config["input"], Results, Steps, R> {
     this.idToIdx["__output__"] = this.idx;
-
-    const ctx = createOutputCtx(this.idToIdx);
-
-    const resolved = fn(ctx);
-
-    const astNode: ArgNode = toNode(resolved);
+    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : [];
+    const ast = toNode(expr);
 
     this.outputIdx = this.idx;
 
     this.steps.push({
       id: "__output__",
       idx: this.idx,
-      method: "__output__",
+      spec: "__out__",
       dependsOn: [...this.frontier],
 
       // guards: [...(this.guards ?? [])],
 
-      resolve: [astNode],
+      resolve: ast,
     });
 
     this.idx += 1;

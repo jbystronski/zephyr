@@ -2,14 +2,8 @@ import { compileModule, executePlan } from "./compiler.js";
 
 import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
 import { ServiceRegistry, Simplify, WorkflowObserver } from "./types.js";
-import { generateWorkflowId } from "./utils.js";
 
-import {
-  createWorkflow,
-  StepDef,
-  WorkflowBuilder,
-  WorkflowDef,
-} from "./workflow-composer.js";
+import { createWorkflow, WorkflowDef } from "./workflow-composer.js";
 
 type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
   x: infer I,
@@ -202,9 +196,7 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
   module: M;
   services: RuntimeServices<M>;
 }) {
-  console.log("compiling module", Object.keys(module.workflows));
-
-  const compiled = compileModule(module, services);
+  const compiled = compileModule(module);
 
   return {
     run: async <K extends keyof M["__public"]>(
@@ -217,16 +209,19 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
     }> => {
       const plan = compiled[COMPILED_GRAPH][workflowId as string];
 
-      // console.dir(compiled[COMPILED_GRAPH], { depth: 16 });
-      //
-      // console.dir(plan, { depth: 9 });
       if (!plan) {
         throw new Error(`Workflow not found: ${String(workflowId)}`);
       }
 
       const results = new Array(plan.maxIdx + 1);
 
-      const output = await executePlan(plan, input, observers, results);
+      const output = await executePlan(
+        plan,
+        input,
+        services,
+        observers,
+        results,
+      );
 
       return {
         output,

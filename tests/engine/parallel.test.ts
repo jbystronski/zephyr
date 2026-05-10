@@ -24,9 +24,9 @@ describe("Parallel execution", () => {
       define: ({ wf }) => ({
         test: wf("parllel-test")
           .parallel(
-            (b) => b.seq("a", "actions", "a"),
-            (b) => b.seq("b", "actions", "b"),
-            (b) => b.seq("c", "actions", "c"),
+            (b) => b.seq("a", (_) => _.actions.a()),
+            (b) => b.seq("b", (_) => _.actions.b()),
+            (b) => b.seq("c", (_) => _.actions.c()),
           )
           .join()
           .build(),

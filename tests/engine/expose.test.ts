@@ -14,8 +14,8 @@ const child = createMod({
   define: ({ wf }) => {
     const childWfOne = wf<{ a: number; b: number }>("one")
       .init("one_init")
-      .seq("add", "actions", "add", (ctx) =>
-        ctx.args(ctx.get("one_init").a, ctx.get("one_init").b),
+      .seq("add", (ctx) =>
+        ctx.actions.add(ctx.get("one_init").a, ctx.get("one_init").b),
       )
 
       .output((ctx) => ctx.get("add"));

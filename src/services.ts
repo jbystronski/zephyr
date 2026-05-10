@@ -1,59 +1,3 @@
-// export const stdLib = {
-//   evalCondition: (cond: any, left: any, right: any) => (cond ? left : right),
-//   coalesce: (left: any, right: any) => left ?? right,
-//   getKey: (o: Record<string, unknown>, k: string) => o?.[k],
-//   mapValues: (obj: Record<string, any>, fn: any) => {
-//     const out: any = {};
-//     for (const k in obj) {
-//       out[k] = fn(obj[k], k);
-//     }
-//     return out;
-//   },
-//   arrayAt: (arr: any[], i: number) => arr?.[i],
-//   ensureArray: (v: any[]) => (Array.isArray(v) ? v : v ? [v] : []),
-//   compact: (obj: Record<string, any>) => {
-//     const out: any = {};
-//     for (const k in obj) {
-//       const v = obj[k];
-//       if (v !== undefined && v !== null) {
-//         out[k] = v;
-//       }
-//     }
-//     return out;
-//   },
-//
-//   withFallback: (v: any, fallback: any) =>
-//     v === undefined || v === null ? fallback : v,
-//   pick: (obj: Record<string, any>, keys: string[]) => {
-//     const out: any = {};
-//     for (const k of keys) {
-//       if (k in obj) out[k] = obj[k];
-//     }
-//     return out;
-//   },
-//   omit: (obj: Record<string, any>, keys: any[]) => {
-//     const out = { ...obj };
-//     for (const k of keys) delete out[k];
-//     return out;
-//   },
-//
-//   merge: (...objs: Record<string, any>[]) => {
-//     const out: Record<string, any> = {};
-//     for (const obj of objs) {
-//       if (!obj || typeof obj !== "object") continue;
-//       Object.assign(out, obj);
-//     }
-//     return out;
-//   },
-//
-//   concatStrings: (...parts: any[]) => {
-//     return parts.join("");
-//   },
-//   toConst: (object: Record<string, any>) => object,
-//   arrayFromLen: (len: number) => Array.from({ length: len }),
-// };
-//
-
 export const stdLib = {
   // --- control ---
   if: (cond: any, a: any, b: any) => (cond ? a : b),
@@ -462,6 +406,8 @@ export const objectLib = {
 };
 
 export const logicLib = {
+  truthy: (v: any) => !!v,
+  falsy: (v: any) => !v,
   and: (...vals: any[]) => vals.every(Boolean),
   or: (...vals: any[]) => vals.some(Boolean),
   not: (v: any) => !v,

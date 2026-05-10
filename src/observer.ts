@@ -1,24 +1,6 @@
 import { eventStream } from "./event-stream.js";
 import { ServiceRegistry, WorkflowObserver } from "./types.js";
 
-// export function composeObserver<S extends ServiceRegistry>(
-//   middleware: WorkflowObserver<S>[],
-//   ctx: Parameters<WorkflowObserver<S>>[0],
-//   core: () => Promise<any>,
-// ) {
-//   let index = -1;
-//
-//   async function dispatch(i: number): Promise<any> {
-//     if (i <= index) throw new Error("next() called multiple times");
-//     index = i;
-//     const fn = middleware[i];
-//     if (!fn) return core();
-//     return fn(ctx, () => dispatch(i + 1));
-//   }
-//
-//   return () => dispatch(0);
-// }
-
 export function composeObserver(middleware: any) {
   return (ctx: any, core: any) => {
     let index = -1;

@@ -1,8 +1,33 @@
-import { ArgNode, ConditionNode } from "./ast.js";
+import { ExprNode } from "./ast.js";
 import { composeObserver } from "./observer.js";
 import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
 import { ExecutionFrame, WorkflowObserver } from "./types.js";
 import { StepDef, WorkflowDef } from "./workflow-composer.js";
+
+type ResultsArray = any[] & {
+  __parent?: ResultsArray;
+};
+
+type EvalCtx = {
+  input: any;
+  results: ResultsArray;
+  services: any;
+};
+
+type CompiledStep = {
+  idx: number;
+  id: string;
+  deps: number[];
+  guards: number[];
+
+  run: (ctx: {
+    input: any;
+    results: ResultsArray;
+    services: any;
+    observers: WorkflowObserver[];
+    frame?: ExecutionFrame;
+  }) => Promise<any>;
+};
 
 export type ExecutionPlan = {
   levels: CompiledStep[][];
@@ -11,23 +36,47 @@ export type ExecutionPlan = {
   maxIdx: number;
 };
 
-type CompiledArg = (input: any, results: any[]) => any;
+function readResult(results: ResultsArray, ref: number) {
+  let cur: ResultsArray | undefined = results;
 
-type CompiledCondition = (input: any, results: any[]) => boolean;
+  while (cur) {
+    if (Object.prototype.hasOwnProperty.call(cur, ref)) {
+      return cur[ref];
+    }
 
-type CompiledStep = {
-  idx: number;
-  deps: number[];
-  guards: number[];
+    cur = cur.__parent;
+  }
 
-  run: (ctx: {
-    input: any;
-    results: any[];
-    observers: WorkflowObserver[];
-    extras: Record<string, any>;
-    runWithObservers: (ctx: any, core: () => Promise<any>) => Promise<any>;
-  }) => Promise<any>;
-};
+  return undefined;
+}
+
+function resolveResult(results: ResultsArray, ref: number) {
+  if (Object.prototype.hasOwnProperty.call(results, ref)) {
+    return results[ref];
+  }
+
+  return results.__parent?.[ref];
+}
+
+function checkGuards(guards: number[] | undefined, results: ResultsArray) {
+  if (!guards?.length) {
+    return true;
+  }
+
+  for (const ref of guards) {
+    if (resolveResult(results, ref) !== true) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function createPipeResults(parent: ResultsArray, size: number): ResultsArray {
+  const local = new Array(size) as ResultsArray;
+  local.__parent = parent;
+  return local;
+}
 
 export function buildLevels(steps: StepDef<any>[]): StepDef<any>[][] {
   const remainingDeps = new Map<number, number>();
@@ -44,7 +93,10 @@ export function buildLevels(steps: StepDef<any>[]): StepDef<any>[][] {
     }
 
     for (const dep of step.dependsOn) {
-      if (!dependents.has(dep)) dependents.set(dep, []);
+      if (!dependents.has(dep)) {
+        dependents.set(dep, []);
+      }
+
       dependents.get(dep)!.push(step.idx);
     }
   }
@@ -53,15 +105,18 @@ export function buildLevels(steps: StepDef<any>[]): StepDef<any>[][] {
 
   while (ready.length > 0) {
     const batch = ready.splice(0);
-    const batchSteps = batch.map((i) => stepByIdx.get(i)!);
 
-    levels.push(batchSteps);
+    levels.push(batch.map((idx) => stepByIdx.get(idx)!));
 
-    for (const id of batch) {
-      for (const child of dependents.get(id) ?? []) {
+    for (const idx of batch) {
+      for (const child of dependents.get(idx) ?? []) {
         const left = remainingDeps.get(child)! - 1;
+
         remainingDeps.set(child, left);
-        if (left === 0) ready.push(child);
+
+        if (left === 0) {
+          ready.push(child);
+        }
       }
     }
   }
@@ -69,156 +124,90 @@ export function buildLevels(steps: StepDef<any>[]): StepDef<any>[][] {
   return levels;
 }
 
-async function runWithRetry(
-  actionFn: () => Promise<any>,
-  stepOptions?: {
-    retry?: number;
-    retryDelay?: number | ((attempt: number) => number);
-  },
-): Promise<any> {
-  const maxRetries = stepOptions?.retry ?? 0;
-  let lastError: any;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await actionFn();
-    } catch (err) {
-      lastError = err;
-      if (attempt === maxRetries) break;
-
-      const delay = stepOptions?.retryDelay;
-      if (typeof delay === "number")
-        await new Promise((r) => setTimeout(r, delay));
-      else if (typeof delay === "function")
-        await new Promise((r) => setTimeout(r, delay(attempt)));
-    }
+async function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
+  if (!ms) {
+    return promise;
   }
 
-  throw lastError;
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
-  if (!ms) return promise;
   return Promise.race([
     promise,
+
     new Promise<T>((_, reject) =>
       setTimeout(() => reject(new Error("Timeout")), ms),
     ),
   ]);
 }
 
-function compileCondition(cond: ConditionNode): (...args: any[]) => boolean {
-  switch (cond.type) {
-    case "eq": {
-      const left = compileArgNode(cond.left);
-      const right = compileArgNode(cond.right);
-      return (input: any, results: any[]) =>
-        left(input, results) === right(input, results);
-    }
+async function runWithRetry<T>(
+  fn: () => Promise<T>,
+  options?: {
+    retry?: number;
+    retryDelay?: number | ((attempt: number) => number);
+  },
+): Promise<T> {
+  const maxRetries = options?.retry ?? 0;
 
-    case "neq": {
-      const left = compileArgNode(cond.left);
-      const right = compileArgNode(cond.right);
-      return (input: any, results: any[]) =>
-        left(input, results) !== right(input, results);
-    }
+  let lastError: any;
 
-    case "gt": {
-      const left = compileArgNode(cond.left);
-      const right = compileArgNode(cond.right);
-      return (input, results) => left(input, results) > right(input, results);
-    }
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
 
-    case "gte": {
-      const left = compileArgNode(cond.left);
-      const right = compileArgNode(cond.right);
-      return (input, results) => left(input, results) >= right(input, results);
-    }
-
-    case "lt": {
-      const left = compileArgNode(cond.left);
-      const right = compileArgNode(cond.right);
-      return (input, results) => left(input, results) < right(input, results);
-    }
-
-    case "lte": {
-      const left = compileArgNode(cond.left);
-      const right = compileArgNode(cond.right);
-      return (input, results) => left(input, results) <= right(input, results);
-    }
-
-    case "and": {
-      const compiled = cond.conditions.map((c) => compileCondition(c));
-      return (input, results) => {
-        for (let i = 0; i < compiled.length; i++) {
-          if (!compiled[i](input, results)) return false;
-        }
-        return true;
-      };
-    }
-
-    case "or": {
-      const compiled = cond.conditions.map((c: any) => compileCondition(c));
-      return (input, results) => {
-        for (let i = 0; i < compiled.length; i++) {
-          if (compiled[i](input, results)) return true;
-        }
-        return false;
-      };
-    }
-
-    case "not": {
-      const inner = compileCondition(cond.condition);
-      return (input, results) => !inner(input, results);
-    }
-
-    case "truthy": {
-      const val = compileArgNode(cond.value);
-      return (input, results) => !!val(input, results);
-    }
-
-    case "falsy": {
-      const val = compileArgNode(cond.value);
-      return (input, results) => !val(input, results);
-    }
-
-    default:
-      throw new Error(`Unknown condition type: ${(cond as any).type}`);
-  }
-}
-
-function compileArgNode(node: ArgNode): CompiledArg {
-  switch (node.type) {
-    case "const": {
-      const value = node.value;
-
-      if (typeof value === "object" && value !== null) {
-        const compiled = deepCompileValue(value);
-        return (input, results) => compiled(input, results);
+      if (attempt === maxRetries) {
+        break;
       }
 
-      return () => value;
-    }
+      const delay = options?.retryDelay;
 
-    case "get": {
-      const ref = node.ref;
-      const path = node.path;
-
-      return (_, results: ResultsArray) => {
-        let v = Object.prototype.hasOwnProperty.call(results, ref)
-          ? results[ref]
-          : results.__parent?.[ref];
-        for (let i = 0; i < path.length; i++) {
-          v = v?.[path[i]];
-        }
-        return v;
-      };
+      if (typeof delay === "number") {
+        await new Promise((r) => setTimeout(r, delay));
+      } else if (typeof delay === "function") {
+        await new Promise((r) => setTimeout(r, delay(attempt)));
+      }
     }
   }
+
+  throw lastError;
 }
 
-function isArgNode(v: any): v is ArgNode {
-  if (!v || typeof v !== "object") return false;
+async function evalConst(value: any, ctx: EvalCtx): Promise<any> {
+  if (value == null) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const out = [];
+
+    for (const item of value) {
+      out.push(await evalConst(item, ctx));
+    }
+
+    return out;
+  }
+
+  if (typeof value === "object") {
+    if (isExprNode(value)) {
+      return evalExpr(value as ExprNode, ctx);
+    }
+
+    const out: any = {};
+
+    for (const key in value) {
+      out[key] = await evalConst(value[key], ctx);
+    }
+
+    return out;
+  }
+
+  return value;
+}
+
+function isExprNode(v: any): v is ExprNode {
+  if (!v || typeof v !== "object") {
+    return false;
+  }
 
   switch (v.type) {
     case "const":
@@ -227,132 +216,310 @@ function isArgNode(v: any): v is ArgNode {
     case "get":
       return "ref" in v && "path" in v;
 
+    case "call":
+      return "service" in v && "method" in v && Array.isArray(v.args);
+
     default:
       return false;
   }
 }
-
-function readResult(results: any[], ref: number) {
-  let cur = results;
-
-  while (cur) {
-    if (Object.prototype.hasOwnProperty.call(cur, ref)) {
-      return cur[ref];
+async function evalExpr(node: ExprNode, ctx: EvalCtx): Promise<any> {
+  switch (node.type) {
+    case "const": {
+      return evalConst(node.value, ctx);
     }
-    cur = (cur as any).__parent;
-  }
 
-  return undefined;
-}
+    case "get": {
+      let value = readResult(ctx.results, node.ref);
 
-function resolveResult(results: any[], ref: number) {
-  if (Object.prototype.hasOwnProperty.call(results, ref)) {
-    return results[ref];
-  }
-  return (results as any).__parent?.[ref];
-}
+      for (const part of node.path) {
+        value = value?.[part];
+      }
 
-function checkGuards(guards: number[] | undefined, results: any[]) {
-  if (!guards || guards.length === 0) return true;
+      return value;
+    }
 
-  for (let i = 0; i < guards.length; i++) {
-    if (resolveResult(results, guards[i]) !== true) {
-      return false;
+    case "call": {
+      const service = ctx.services[node.service];
+
+      if (!service) {
+        throw new Error(`Unknown service ${node.service}`);
+      }
+
+      const method = service[node.method];
+
+      if (!method) {
+        throw new Error(`Unknown method ${node.service}.${node.method}`);
+      }
+
+      const args = [];
+
+      for (const arg of node.args) {
+        args.push(await evalExpr(arg, ctx));
+      }
+
+      return method(...args);
     }
   }
-
-  return true;
 }
 
-// function checkGuards(guards: number[] | undefined, results: any[]) {
-//   if (!guards || guards.length === 0) return true;
+// async function executeStep(
+//   step: StepDef<any>,
+//   ctx: EvalCtx,
+//   observers: WorkflowObserver[],
+// ): Promise<any> {
+//   switch (step.spec) {
+//     case "__init__": {
+//       if (!step.resolve) {
+//         return ctx.input;
+//       }
 //
-//   for (let i = 0; i < guards.length; i++) {
-//     if (!results[guards[i]]) return false;
-//   }
+//       return evalExpr(step.resolve as ExprNode, ctx);
+//     }
 //
-//   return true;
-// }
-
-// function checkGuards(guards: Guard[], results: any[]) {
-//   if (!guards || guards.length === 0) return true;
+//     case "__out__": {
+//       if (!step.resolve) {
+//         return undefined;
+//       }
 //
-//   for (const g of guards) {
-//     if (typeof g === "number") {
-//       if (!results[g]) return false;
-//     } else {
-//       if (results[g.not] === true) return false;
+//       return evalExpr(step.resolve as ExprNode, ctx);
+//     }
+//
+//     case "__join__": {
+//       return undefined;
+//     }
+//
+//     case "__pipe__": {
+//       return runPipeStep(step, ctx, observers);
+//     }
+//
+//     default: {
+//       if (!step.resolve) {
+//         return undefined;
+//       }
+//
+//       return evalExpr(step.resolve as ExprNode, ctx);
 //     }
 //   }
-//   return true;
 // }
-
-function deepCompileValue(value: any) {
-  if (value == null) return () => value;
-
-  if (Array.isArray(value)) {
-    const compiled = value.map((v) => deepCompileValue(v));
-
-    return (input: any, results: any[]) => {
-      const out = new Array(compiled.length);
-      for (let i = 0; i < compiled.length; i++) {
-        out[i] = compiled[i](input, results);
-      }
-      return out;
-    };
-  }
-
-  if (typeof value === "object") {
-    if (isArgNode(value)) {
-      return compileArgNode(value as ArgNode);
+//
+async function executeStep(
+  step: StepDef<any>,
+  ctx: EvalCtx,
+  observers: WorkflowObserver[],
+  frame?: ExecutionFrame,
+): Promise<any> {
+  try {
+    if (frame) {
+      frame.attempts++;
     }
 
-    const keys = Object.keys(value);
-    const compiledEntries = keys.map((k) => [k, deepCompileValue(value[k])]);
+    let result: any;
 
-    return (input: any, results: any[]) => {
-      const out: any = {};
-      for (let i = 0; i < compiledEntries.length; i++) {
-        const [k, fn] = compiledEntries[i];
-        out[k as any] = (fn as any)(input, results);
+    switch (step.spec) {
+      case "__init__": {
+        result = step.resolve
+          ? await evalExpr(step.resolve as ExprNode, ctx)
+          : ctx.input;
+
+        break;
       }
-      return out;
-    };
-  }
 
-  return () => value;
+      case "__out__": {
+        result = step.resolve
+          ? await evalExpr(step.resolve as ExprNode, ctx)
+          : undefined;
+
+        break;
+      }
+
+      case "__join__": {
+        result = undefined;
+        break;
+      }
+
+      case "__pipe__": {
+        result = await runPipeStep(step, ctx, observers);
+        break;
+      }
+
+      default: {
+        result = step.resolve
+          ? await evalExpr(step.resolve as ExprNode, ctx)
+          : undefined;
+
+        break;
+      }
+    }
+
+    if (frame) {
+      frame.output = result;
+      frame.end = Date.now();
+    }
+
+    return result;
+  } catch (err) {
+    if (frame) {
+      frame.error = err;
+      frame.end = Date.now();
+    }
+
+    throw err;
+  }
 }
 
-async function runAction(args: any[] | undefined, action: any) {
-  if (!args) return action();
-  return action(...args);
+async function runPipeStep(
+  step: StepDef<any>,
+  ctx: EvalCtx,
+  observers: WorkflowObserver[],
+): Promise<any> {
+  const items = await evalExpr(step.resolve as ExprNode, ctx);
+
+  const mode = step.pipe?.mode ?? "map";
+
+  const runItem = async (item: any) => {
+    const localResults = createPipeResults(
+      ctx.results,
+      (step.pipe as any).plan.maxIdx + 1,
+    );
+
+    return executePlan(
+      (step.pipe as any).plan,
+      item,
+      ctx.services,
+      observers,
+      localResults,
+    );
+  };
+
+  if (mode === "map") {
+    return Promise.all(items.map(runItem));
+  }
+
+  if (mode === "filter") {
+    const matches = await Promise.all(items.map(runItem));
+
+    return items.filter((_: any, i: number) => !!matches[i]);
+  }
+
+  if (mode === "find") {
+    for (const item of items) {
+      if (await runItem(item)) {
+        return item;
+      }
+    }
+
+    return undefined;
+  }
+
+  if (mode === "some") {
+    for (const item of items) {
+      if (await runItem(item)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  if (mode === "every") {
+    for (const item of items) {
+      if (!(await runItem(item))) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  if (mode === "count") {
+    let count = 0;
+
+    for (const item of items) {
+      if (await runItem(item)) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  throw new Error(`Unknown pipe mode ${mode}`);
 }
 
 export async function executePlan(
   plan: ExecutionPlan,
   input: any,
+  services: any,
   observers: WorkflowObserver[],
-  results: any[],
+  results: ResultsArray,
 ) {
-  const extras: Record<string, any> = { frames: {} };
+  const hasObservers = observers.length > 0;
 
-  const runWithObservers = composeObserver(observers);
+  const extras: Record<string, any> = {
+    frames: {},
+  };
+
+  const runWithObservers = hasObservers ? composeObserver(observers) : null;
 
   for (const level of plan.levels) {
     await Promise.all(
-      level.map((step) => {
+      level.map(async (step) => {
         if (!checkGuards(step.guards, results)) {
           results[step.idx] = undefined;
           return;
         }
 
-        return step.run({
-          input,
-          results,
-          observers,
-          extras,
-          runWithObservers,
-        });
+        const frame: ExecutionFrame | undefined = hasObservers
+          ? {
+              stepId: `${step.id}:${step.idx}`,
+              attempts: 1,
+              start: Date.now(),
+            }
+          : undefined;
+
+        if (frame) {
+          extras.frames[step.idx] = frame;
+        }
+
+        const execute = async () => {
+          return step.run({
+            input,
+            results,
+            services,
+            observers,
+            frame,
+          });
+        };
+
+        try {
+          const result = runWithObservers
+            ? await runWithObservers(
+                {
+                  stepId: `${step.idx}`,
+                  input,
+                  results,
+                  extras,
+                  frame,
+                },
+                execute,
+              )
+            : await execute();
+
+          results[step.idx] = result;
+
+          if (frame) {
+            frame.output = result;
+            frame.end = Date.now();
+          }
+        } catch (err) {
+          if (frame) {
+            frame.error = err;
+            frame.end = Date.now();
+          }
+
+          throw err;
+        }
       }),
     );
   }
@@ -362,286 +529,44 @@ export async function executePlan(
   }
 
   if (plan.exitIndexes?.length) {
-    return plan.exitIndexes.length === 1
-      ? results[plan.exitIndexes[0]]
-      : plan.exitIndexes.map((i) => results[i]);
+    if (plan.exitIndexes.length === 1) {
+      return results[plan.exitIndexes[0]];
+    }
+
+    return plan.exitIndexes.map((idx) => results[idx]);
   }
 
   return undefined;
 }
 
-type ResultsArray = any[] & {
-  __parent?: ResultsArray;
-};
-
-type RuntimeCtx = {
-  step: any;
-  input: any;
-  results: any[];
-  compiledResolve: CompiledArg[] | null;
-  compiledEval?: CompiledCondition | null;
-  observers: WorkflowObserver[];
-  frame?: ExecutionFrame;
-};
-
-function createPipeResults(parent: ResultsArray, size: number): ResultsArray {
-  const local = new Array(size) as ResultsArray;
-  local.__parent = parent;
-  return local;
-}
-
-async function runStepCore({
-  step,
-  input,
-  results,
-  observers,
-  compiledEval,
-  compiledResolve,
-  frame,
-}: RuntimeCtx) {
-  return async () => {
-    try {
-      if (frame) frame.attempts++;
-
-      if (step.method === "__eval__") {
-        const res = compiledEval!(input, results);
-
-        if (frame) {
-          frame.output = res;
-          frame.end = Date.now();
-        }
-
-        return res;
-      }
-
-      if (step.method === "__join__") {
-        if (frame) {
-          frame.end = Date.now();
-        }
-
-        return;
-      }
-
-      let resolvedArgs: any[] | undefined;
-
-      if (compiledResolve) {
-        const len = compiledResolve.length;
-        resolvedArgs = new Array(len);
-
-        for (let i = 0; i < len; i++) {
-          resolvedArgs[i] = compiledResolve[i](input, results);
-        }
-      }
-
-      if (frame) {
-        frame.input = resolvedArgs;
-      }
-
-      if (step.method === "__pipe__") {
-        const items = resolvedArgs?.[0] ?? [];
-        const mode = step.pipe.mode ?? "map";
-
-        const runPipeIteration = (item: any) => {
-          const localResults = createPipeResults(
-            results,
-            step.pipe.plan.maxIdx + 1,
-          );
-
-          return executePlan(step.pipe.plan, item, observers, localResults);
-        };
-
-        if (
-          mode === "find" ||
-          mode === "some" ||
-          mode === "every" ||
-          mode === "count"
-        ) {
-          let count = 0;
-          for (let i = 0; i < items.length; i++) {
-            const res = await runPipeIteration(items[i]);
-
-            if (mode === "find" && res) {
-              return items[i];
-            }
-
-            if (mode === "some" && res) {
-              return true;
-            }
-
-            if (mode === "every" && !res) {
-              return false;
-            }
-
-            if (mode === "count" && res) {
-              count++;
-            }
-          }
-
-          if (mode === "find") {
-            return undefined;
-          }
-
-          if (mode === "some") {
-            return false;
-          }
-
-          if (mode === "every") {
-            return true;
-          }
-
-          if (mode === "count") {
-            return count;
-          }
-        }
-
-        const outputs = await Promise.all(items.map(runPipeIteration));
-        if (mode === "map") {
-          return outputs;
-        }
-
-        if (mode === "filter") {
-          const filtered = (items as any[]).filter((_, i) => !!outputs[i]);
-
-          return filtered;
-        }
-
-        throw new Error(`Unknown pipe mode: ${mode}`);
-      }
-
-      if (step.method === "__init__") {
-        if (step.resolve.length === 0) {
-          return input;
-        } else {
-          return resolvedArgs?.[0];
-        }
-      }
-
-      if (step.method === "__action__") {
-        const action = step.action;
-
-        const result = await withTimeout(
-          runWithRetry(() => runAction(resolvedArgs, action), step.options),
-          step.options?.timeout,
-        );
-
-        if (frame) {
-          frame.output = result;
-          frame.end = Date.now();
-        }
-
-        return result;
-      }
-
-      if (step.method === "__output__") {
-        const val = resolvedArgs?.[0];
-
-        if (frame) {
-          frame.output = val;
-          frame.end = Date.now();
-        }
-
-        return val;
-      }
-
-      throw new Error(`Unknown step type: ${step.idx}`);
-    } catch (err) {
-      if (frame) {
-        frame.error = err;
-        frame.end = Date.now();
-      }
-      throw err;
-    }
-  };
-}
-
 export function compileStep(step: StepDef<any>): CompiledStep {
-  let compiledEval: ((input: any, results: any[]) => boolean) | null = null;
-
-  if (step.method === "__eval__") {
-    compiledEval = compileCondition(step.eval!);
-  }
-
-  const compiledResolve =
-    step.method === "__eval__"
-      ? null
-      : (step.resolve?.map((n: ArgNode) => compileArgNode(n)) ?? null);
-
   return {
+    id: step.id,
     idx: step.idx,
     deps: step.dependsOn,
     guards: step.guards ?? [],
 
-    run: async ({ input, results, observers, extras, runWithObservers }) => {
-      const params: RuntimeCtx = {
+    run: async ({ input, results, services, observers, frame }) => {
+      const ctx: EvalCtx = {
         input,
-        step,
         results,
-        observers,
-        compiledEval,
-        compiledResolve,
+        services,
       };
 
-      let res: any;
-
-      if (observers.length) {
-        const frame: ExecutionFrame = {
-          stepId: `${step.id}:${step.idx}`,
-          attempts: 0,
-          start: Date.now(),
-        };
-
-        params.frame = frame;
-
-        extras.frames[step.idx] = params.frame;
-
-        const fn = await runStepCore(params);
-
-        res = await runWithObservers(
-          { stepId: `${step.id}:${step.idx}`, input, results, extras, frame },
-          fn,
-        );
-      } else {
-        const fn = await runStepCore(params);
-
-        res = await fn();
+      if (step.pipe) {
+        return runPipeStep(step, ctx, observers);
       }
-      results[step.idx] = res;
 
-      return res;
+      return executeStep(step, ctx, observers, frame);
     },
-  };
-}
-
-export function compileModule(mod: any, services: any): any {
-  const deps = mod[DEPS] ?? {};
-
-  const compiledDeps = Object.fromEntries(
-    Object.entries(deps).map(([name, child]: any) => [
-      name,
-      compileModule(child, services),
-    ]),
-  );
-
-  const compiledGraph = Object.fromEntries(
-    Object.entries(mod[EXEC_GRAPH]).map(([wfId, wf]: any) => [
-      wfId,
-      compileWorkflow(wf, services, compiledDeps),
-    ]),
-  );
-
-  return {
-    ...mod,
-    [DEPS]: compiledDeps,
-    [COMPILED_GRAPH]: compiledGraph,
   };
 }
 
 export function compileWorkflow(
   workflow: WorkflowDef<any, any, any, any>,
-  services: any,
-  deps: Record<string, any>,
 ): ExecutionPlan {
   let outputIndex: number | undefined;
+
   let exitIndexes: number[] | undefined;
 
   if (workflow.outputIdx !== undefined) {
@@ -651,30 +576,14 @@ export function compileWorkflow(
   }
 
   const compiledSteps = workflow.steps.map((step: any) => {
-    if (step.service) {
-      const s = services?.[step.service!];
-      if (!s) {
-        throw new Error(`Service not found: ${step.service}`);
-      }
-
-      const action = s[step.method];
-      if (!action) {
-        throw new Error(`Method ${step.method} not found on ${step.service}`);
-      }
-
+    if (step.pipe?.workflow) {
       return {
         ...step,
-        method: "__action__",
-        action,
-      };
-    }
 
-    if (step.method === "__pipe__") {
-      return {
-        ...step,
         pipe: {
           ...step.pipe,
-          plan: compileWorkflow(step.pipe.workflow, services, deps),
+
+          plan: compileWorkflow(step.pipe.workflow),
         },
       };
     }
@@ -683,6 +592,7 @@ export function compileWorkflow(
   });
 
   const levels = buildLevels(compiledSteps);
+
   const compiledLevels = levels.map((level) =>
     level.map((step) => compileStep(step)),
   );
@@ -691,8 +601,34 @@ export function compileWorkflow(
 
   return {
     levels: compiledLevels,
-    maxIdx,
     outputIndex,
     exitIndexes,
+    maxIdx,
+  };
+}
+
+export function compileModule(mod: any): any {
+  const deps = mod[DEPS] ?? {};
+
+  const compiledDeps = Object.fromEntries(
+    Object.entries(deps).map(([name, child]: any) => [
+      name,
+      compileModule(child),
+    ]),
+  );
+
+  const compiledGraph = Object.fromEntries(
+    Object.entries(mod[EXEC_GRAPH]).map(([wfId, wf]: any) => [
+      wfId,
+      compileWorkflow(wf),
+    ]),
+  );
+
+  return {
+    ...mod,
+
+    [DEPS]: compiledDeps,
+
+    [COMPILED_GRAPH]: compiledGraph,
   };
 }
