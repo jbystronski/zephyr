@@ -23,4 +23,5 @@ export {
 } from "./services.js";
 export * from "./types.js";
 
+export * from "./ast.js";
 export { useMetrics, useLog } from "./observer.js";

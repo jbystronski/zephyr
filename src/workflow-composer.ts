@@ -1,6 +1,5 @@
 import {
   createExprCtx,
-  createGetter,
   ExprCtx,
   ExprNode,
   remapWorkflowInstance,
