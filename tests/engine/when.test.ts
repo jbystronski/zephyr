@@ -12,16 +12,16 @@ const mod = createModuleFactory<StandardServices>()({
   define: ({ wf }) => ({
     a: wf<{ input: number }>("a")
       .init("a")
-      .seq("step1", (ctx) => ctx.math_std.add(ctx.get("a").input, 3))
-      .seq("step2", (ctx) => ctx.math_std.mul(ctx.get("step1"), 2))
+      .seq("step1", (ctx) => ctx.math.add(ctx.get("a").input, 3))
+      .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2))
       .if(
         "step2 equal 12",
-        (ctx) => ctx.logic_std.eq(ctx.get("step2"), 12),
+        (ctx) => ctx.logic.eq(ctx.get("step2"), 12),
         (b) =>
           b
-            .seq("step3", (ctx) => ctx.math_std.add(ctx.get("step2"), 3))
+            .seq("step3", (ctx) => ctx.math.add(ctx.get("step2"), 3))
 
-            .seq("step4", (ctx) => ctx.math_std.add(ctx.get("step3")!, 3)),
+            .seq("step4", (ctx) => ctx.math.add(ctx.get("step3")!, 3)),
       )
 
       .output((ctx) => ({
@@ -32,19 +32,19 @@ const mod = createModuleFactory<StandardServices>()({
 
     b: wf<{ input: number }>("b")
       .init("b")
-      .seq("step1", (c) => c.math_std.add(c.get("b").input, 3))
-      .seq("step2", (c) => c.math_std.mul(c.get("step1"), 2))
+      .seq("step1", (c) => c.math.add(c.get("b").input, 3))
+      .seq("step2", (c) => c.math.mul(c.get("step1"), 2))
       .if(
         "step2 equals 999",
-        (c) => c.logic_std.eq(c.get("step2"), 999),
+        (c) => c.logic.eq(c.get("step2"), 999),
         (b) =>
           b
-            .seq("step3", (c) => c.math_std.add(c.get("step2"), 3))
+            .seq("step3", (c) => c.math.add(c.get("step2"), 3))
 
-            .seq("step4", (c) => c.math_std.add(c.get("step2"), 3)),
+            .seq("step4", (c) => c.math.add(c.get("step2"), 3)),
       ) // ❌ false
 
-      .seq("step5", (ctx) => ctx.math_std.mul(ctx.get("step1"), 2))
+      .seq("step5", (ctx) => ctx.math.mul(ctx.get("step1"), 2))
       .output(({ get }) => ({
         a: get("step2"),
         b: get("step3"),
@@ -54,28 +54,28 @@ const mod = createModuleFactory<StandardServices>()({
 
     c: wf<{ input: number }>("c")
       .init("c")
-      .seq("step1", (ctx) => ctx.math_std.add(ctx.get("c").input, 3)) // 3 + 3 = 6
-      .seq("step2", (ctx) => ctx.math_std.mul(ctx.get("step1"), 2)) // 6 * 2 = 12
+      .seq("step1", (ctx) => ctx.math.add(ctx.get("c").input, 3)) // 3 + 3 = 6
+      .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 6 * 2 = 12
 
       .if(
         "step2 equals 12",
-        (ctx) => ctx.logic_std.eq(ctx.get("step2"), 12),
+        (ctx) => ctx.logic.eq(ctx.get("step2"), 12),
         (b) =>
           b
             .parallel(
               (b0) =>
                 b0
-                  .seq("p0", (ctx) => ctx.math_std.add(ctx.get("step2"), 1)) // 13
+                  .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1)) // 13
                   .as<number | undefined>(),
 
               (b1) =>
                 b1
-                  .seq("p1", (ctx) => ctx.math_std.add(ctx.get("step2"), 2)) // 14
+                  .seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2)) // 14
                   .as<number | undefined>(),
 
               (b2) =>
                 b2
-                  .seq("p2", (ctx) => ctx.math_std.add(ctx.get("step2"), 3)) // 15
+                  .seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)) // 15
                   .as<number | undefined>(),
             )
             .join(),
@@ -90,28 +90,28 @@ const mod = createModuleFactory<StandardServices>()({
 
     d: wf<{ input: number }>("d")
       .init("d")
-      .seq("step1", (ctx) => ctx.math_std.add(ctx.get("d").input, 3)) // 6
-      .seq("step2", (ctx) => ctx.math_std.mul(ctx.get("step1"), 2)) // 12
+      .seq("step1", (ctx) => ctx.math.add(ctx.get("d").input, 3)) // 6
+      .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 12
 
       .if(
         "step2 equals 999",
-        (ctx) => ctx.logic_std.eq(ctx.get("step2"), 999),
+        (ctx) => ctx.logic.eq(ctx.get("step2"), 999),
         (b) =>
           b
             .parallel(
               (b0) =>
                 b0
-                  .seq("p0", (ctx) => ctx.math_std.add(ctx.get("step2"), 1))
+                  .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1))
                   .as<number | undefined>(),
 
               (b1) =>
                 b1
-                  .seq("p1", (ctx) => ctx.math_std.add(ctx.get("step2"), 2))
+                  .seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2))
                   .as<number | undefined>(),
 
               (b2) =>
                 b2
-                  .seq("p2", (ctx) => ctx.math_std.add(ctx.get("step2"), 3))
+                  .seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3))
                   .as<number | undefined>(),
             )
 
@@ -127,24 +127,24 @@ const mod = createModuleFactory<StandardServices>()({
 
     e: wf<{ input: number }>("e")
       .init("e")
-      .seq("step1", (ctx) => ctx.math_std.add(ctx.get("e").input, 3)) // 3 + 3 = 6
-      .seq("step2", (ctx) => ctx.math_std.mul(ctx.get("step1"), 2)) // 6 * 2 = 12
+      .seq("step1", (ctx) => ctx.math.add(ctx.get("e").input, 3)) // 3 + 3 = 6
+      .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 6 * 2 = 12
 
       .parallel(
         // ✅ runs (12 === 12)
         (b0) =>
           b0.if(
             "step2 equals 12",
-            (ctx) => ctx.logic_std.eq(ctx.get("step2"), 12),
-            (b) => b.seq("p0", (ctx) => ctx.math_std.add(ctx.get("step2"), 1)),
+            (ctx) => ctx.logic.eq(ctx.get("step2"), 12),
+            (b) => b.seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1)),
           ),
 
         // ❌ skipped (12 !== 999)
         (b1) =>
           b1.if(
             "step2 equals 999",
-            (ctx) => ctx.logic_std.eq(ctx.get("step2"), 999),
-            (b) => b.seq("p1", (ctx) => ctx.math_std.add(ctx.get("step2"), 2)),
+            (ctx) => ctx.logic.eq(ctx.get("step2"), 999),
+            (b) => b.seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2)),
           ),
 
         // .endWhen(),
@@ -152,7 +152,7 @@ const mod = createModuleFactory<StandardServices>()({
         // ✅ always runs
         (b2) =>
           b2
-            .seq("p2", (ctx) => ctx.math_std.add(ctx.get("step2"), 3)) // 15
+            .seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)) // 15
             .as<number | undefined>(),
       )
 
@@ -167,37 +167,35 @@ const mod = createModuleFactory<StandardServices>()({
 
     g: wf<{ input: number }>("g")
       .init("g")
-      .seq("step1", (ctx) => ctx.math_std.add(ctx.get("g").input, 3)) // 6
-      .seq("step2", (ctx) => ctx.math_std.mul(ctx.get("step1"), 2)) // 12
+      .seq("step1", (ctx) => ctx.math.add(ctx.get("g").input, 3)) // 6
+      .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 12
 
       // ✅ parent condition TRUE
       .if(
         "step2 equals 12",
-        (ctx) => ctx.logic_std.eq(ctx.get("step2"), 12),
+        (ctx) => ctx.logic.eq(ctx.get("step2"), 12),
         (b) =>
           b.parallel(
             // ✅ both conditions TRUE → runs
             (b0) =>
               b0.if(
                 "nested step2 equals 12",
-                (ctx) => ctx.logic_std.eq(ctx.get("step2"), 12),
-                (b) =>
-                  b.seq("p0", (ctx) => ctx.math_std.add(ctx.get("step2"), 1)), // 13
+                (ctx) => ctx.logic.eq(ctx.get("step2"), 12),
+                (b) => b.seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1)), // 13
               ),
 
             // ❌ inner condition FALSE → skipped
             (b1) =>
               b1.if(
                 "nested step2 equals 999",
-                (ctx) => ctx.logic_std.eq(ctx.get("step2"), 999),
-                (b) =>
-                  b.seq("p1", (ctx) => ctx.math_std.add(ctx.get("step2"), 2)),
+                (ctx) => ctx.logic.eq(ctx.get("step2"), 999),
+                (b) => b.seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2)),
               ),
 
             // ✅ no inner condition → inherits parent → runs
             (b2) =>
               b2
-                .seq("p2", (ctx) => ctx.math_std.add(ctx.get("step2"), 3)) // 15
+                .seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)) // 15
                 .as<number | undefined>(),
           ),
       )
@@ -213,31 +211,31 @@ const mod = createModuleFactory<StandardServices>()({
 
     h: wf<{ input: number }>("h")
       .init("h")
-      .seq("step1", (ctx) => ctx.math_std.add(ctx.get("h").input, 3)) // 6
-      .seq("step2", (ctx) => ctx.math_std.mul(ctx.get("step1"), 2)) // 12
+      .seq("step1", (ctx) => ctx.math.add(ctx.get("h").input, 3)) // 6
+      .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 12
 
       // ❌ everything skipped
       .if(
         "step2 equals 999",
-        (ctx) => ctx.logic_std.eq(ctx.get("step2"), 999),
+        (ctx) => ctx.logic.eq(ctx.get("step2"), 999),
         (b) =>
           b
             .parallel(
               (b0) =>
                 b0
-                  .seq("p0", (ctx) => ctx.math_std.add(ctx.get("step2"), 1))
+                  .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1))
                   .as<number | undefined>(),
 
               (b1) =>
                 b1
-                  .seq("p1", (ctx) => ctx.math_std.add(ctx.get("step2"), 2))
+                  .seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2))
                   .as<number | undefined>(),
             )
             .join(),
       )
 
       // MUST still run
-      .seq("after", (ctx) => ctx.math_std.mul(ctx.get("step1"), 2))
+      .seq("after", (ctx) => ctx.math.mul(ctx.get("step1"), 2))
 
       .output(({ get: _ }) => ({
         base: _("step2"),
@@ -324,7 +322,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
           .init("sum")
           .seq("add", (ctx) => {
             executed = true; // 🔥 detect execution
-            return ctx.math_std.add(ctx.get("sum").a, ctx.get("sum").b);
+            return ctx.math.add(ctx.get("sum").a, ctx.get("sum").b);
           })
           .output((ctx) => ctx.get("add")),
       }),
@@ -336,7 +334,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
         const test = wf("test")
           .if(
             "true equals false",
-            (ctx) => ctx.logic_std.eq(true, false),
+            (ctx) => ctx.logic.eq(true, false),
             (b) => b.subflow("result", "child.sum", () => ({ a: 2, b: 3 })),
           ) // ❌ skip subflow
 

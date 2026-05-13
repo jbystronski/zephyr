@@ -162,7 +162,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .seq("first", ({ get, logic_std: { and, eq } }) =>
+            .seq("first", ({ get, logic: { and, eq } }) =>
               and(eq(get("animal").kind, "reptile")),
             ),
       )
@@ -171,7 +171,7 @@ const testPipe = createMod({
     const skipSumTest = wf("skipSumTest")
       .if(
         "true is false",
-        (ctx) => ctx.logic_std.eq(true, true),
+        (ctx) => ctx.logic.eq(true, true),
         (b) =>
           b
             .subflow("result", "c.sum", () => ({ a: 2, b: 3 }))
@@ -182,9 +182,7 @@ const testPipe = createMod({
               (b) =>
                 b
                   .init("num")
-                  .seq("op 1", ({ get, math_std }) =>
-                    math_std.mul(get("num"), 4),
-                  ),
+                  .seq("op 1", ({ get, math }) => math.mul(get("num"), 4)),
             ),
       ) // ❌ skip subflow
 
@@ -273,7 +271,7 @@ const modB = mod({
       .init("i")
       .if(
         "key exists",
-        ({ logic_std, get }) => logic_std.truthy(get("i").key),
+        ({ logic, get }) => logic.truthy(get("i").key),
         (b) =>
           b.pipe(
             "find pipe",
@@ -283,7 +281,7 @@ const modB = mod({
               b
                 .init("item")
                 .seq("match label", (_) =>
-                  _.logic_std.eq(_.get("i").key, _.get("item").label),
+                  _.logic.eq(_.get("i").key, _.get("item").label),
                 ),
           ),
       )
@@ -406,7 +404,7 @@ const modX = modAlt({
         (b) =>
           b
             .init("to process")
-            .seq("upp", (_) => _.string_std.upper(_.get("to process"))),
+            .seq("upp", (_) => _.string.upper(_.get("to process"))),
       )
       .sub("subflow add prefix to items", "local.subOne", (_) => ({
         items: _.get("i").items,

@@ -80,7 +80,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .seq("first", ({ get, logic_std: { and, eq } }) =>
+            .seq("first", ({ get, logic: { and, eq } }) =>
               and(
                 eq(get("animal").kind, "bird"),
                 eq(get("animal").climate, "arctic"),
@@ -98,7 +98,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .seq("first", ({ get, logic_std: { and, eq } }) =>
+            .seq("first", ({ get, logic: { and, eq } }) =>
               and(eq(get("animal").climate, "tropical")),
             ),
       )
@@ -113,7 +113,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .seq("first", ({ get, logic_std: { and, eq } }) =>
+            .seq("first", ({ get, logic: { and, eq } }) =>
               and(eq(get("animal").climate, "arctic")),
             ),
       )
@@ -128,7 +128,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("animal")
-            .seq("first", ({ get, logic_std: { and, eq } }) =>
+            .seq("first", ({ get, logic: { and, eq } }) =>
               and(eq(get("animal").kind, "reptile")),
             ),
       )
@@ -150,7 +150,7 @@ const testPipe = createMod({
         (b) =>
           b
             .init("pv2_init")
-            .seq("upp", (ctx) => ctx.string_std.upper(ctx.get("pv2_init")))
+            .seq("upp", (ctx) => ctx.string.upper(ctx.get("pv2_init")))
             .seq("pref", ({ std: { concat }, get }) => concat("<", get("upp")))
             .seq("suffix", ({ std: { concat }, get }) =>
               concat(get("pref"), ">"),

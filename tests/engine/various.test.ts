@@ -45,7 +45,7 @@ const modB = mod({
       .init("i")
       .if(
         "has key",
-        ({ logic_std: { truthy }, get }) => truthy(get("i").key),
+        ({ logic: { truthy }, get }) => truthy(get("i").key),
         (b) =>
           b.pipe(
             "find pipe",
@@ -54,7 +54,7 @@ const modB = mod({
             (b) =>
               b
                 .init("item")
-                .seq("match label", ({ get, logic_std: { eq } }) =>
+                .seq("match label", ({ get, logic: { eq } }) =>
                   eq(get("i").key, get("item").label),
                 ),
           ),
