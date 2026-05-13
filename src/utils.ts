@@ -86,13 +86,13 @@ export function createServices() {
 }
 
 export const baseServices = createServices()
-  .add("date_std", dateLib)
+  .add("date", dateLib)
   .add("std", stdLib)
-  .add("string_std", stringLib)
-  .add("math_std", mathLib)
-  .add("array_std", arrayLib)
-  .add("object_std", objectLib)
-  .add("logic_std", logicLib)
-  .add("misc_std", miscLib)
-  .add("extended_json_std", extendedJsonLib)
-  .add("err_std", errLib);
+  .add("string", stringLib)
+  .add("math", mathLib)
+  .add("array", arrayLib)
+  .add("object", objectLib)
+  .add("logic", logicLib)
+  .add("misc", miscLib)
+  .add("extended_json", extendedJsonLib)
+  .add("err", errLib);
