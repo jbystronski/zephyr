@@ -1,67 +1,76 @@
 export const stdLib = {
   // --- control ---
   if: (cond: any, a: any, b: any) => (cond ? a : b),
-  coalesce: (a: any, b: any) => a ?? b,
+  coalesce: (...values: any[]) => {
+    for (const v of values) {
+      if (v !== undefined && v !== null) {
+        return v;
+      }
+    }
 
-  // --- object ---
-  get: (obj: any, key: string) => obj?.[key],
-  merge: (...objs: Record<string, any>[]) => {
+    return undefined;
+  },
+
+  maybe: (cond: any, value: any) => {
+    return cond ? value : undefined;
+  },
+
+  choose: (pairs: [boolean, any][], fallback?: any) => {
+    for (const [cond, value] of pairs) {
+      if (cond) {
+        return value;
+      }
+    }
+
+    return fallback;
+  },
+
+  firstDef: (...values: any[]) => {
+    for (const v of values) {
+      if (v !== undefined) {
+        return v;
+      }
+    }
+
+    return undefined;
+  },
+
+  firstTruthy: (...values: any[]) => {
+    for (const v of values) {
+      if (v) {
+        return v;
+      }
+    }
+
+    return undefined;
+  },
+
+  collect: (...values: any[]) => {
+    return values.filter((v) => v !== undefined);
+  },
+
+  mergeDef: (...objs: Record<string, any>[]) => {
     const out: Record<string, any> = {};
-    for (const o of objs) {
-      if (o && typeof o === "object") Object.assign(out, o);
+
+    for (const obj of objs) {
+      if (!obj || typeof obj !== "object") {
+        continue;
+      }
+
+      for (const key in obj) {
+        const value = obj[key];
+
+        if (value !== undefined) {
+          out[key] = value;
+        }
+      }
     }
-    return out;
-  },
-  pick: (obj: Record<string, any>, keys: string[]): Record<string, any> => {
-    const out: any = {};
-    for (const k of keys) if (k in obj) out[k] = obj[k];
-    return out;
-  },
-  omit: (obj: Record<string, any>, keys: string[]) => {
-    const out = { ...obj };
-    for (const k of keys) delete out[k];
+
     return out;
   },
 
-  // --- array ---
-  at: (arr: any[], i: number) => arr?.[i],
-  ensure: (v: any) => (Array.isArray(v) ? v : v ? [v] : []),
-  map: (arr: any[], fn: (v: any, i?: number) => any) => arr.map(fn),
-
-  // --- object transforms ---
-  mapValues: (obj: Record<string, any>, fn: any) => {
-    const out: any = {};
-    for (const k in obj) out[k] = fn(obj[k], k);
-    return out;
-  },
-
-  // --- cleanup ---
-  compact: (obj: Record<string, any>) => {
-    const out: any = {};
-    for (const k in obj) {
-      const v = obj[k];
-      if (v !== undefined && v !== null) out[k] = v;
-    }
-    return out;
-  },
-
-  // --- misc ---
   concat: (...parts: any[]) => parts.join(""),
   const: (v: any) => v,
-
-  // Set only if value actually changed
-  setIfChanged: (key: string, prev: any, next: any): Record<string, any> => {
-    return Object.is(prev, next) ? {} : { [key]: next };
-  },
-
-  // to be used when null has semantic meaning
-  setIfDefined: (key: string, value: any | undefined): Record<string, any> => {
-    return value === undefined ? {} : { [key]: value };
-  },
-
-  setIfPresent: (key: string, value: any | null | undefined) => {
-    return value == null ? {} : { [key]: value };
-  },
 };
 
 export const dateLib = {
@@ -218,6 +227,10 @@ export const stringLib = {
 };
 
 export const arrayLib = {
+  compact: (arr: any[]) => {
+    return arr.filter((v) => v !== undefined && v !== null);
+  },
+
   isOneOf: (allowedValues: readonly any[], value: unknown) => {
     return allowedValues.includes(value);
   },
@@ -242,7 +255,7 @@ export const arrayLib = {
   },
 
   length: (arr: any[]) => arr?.length ?? 0,
-
+  ensure: (v: any) => (Array.isArray(v) ? v : v ? [v] : []),
   // --- access ---
   first: (arr: any[]) => arr?.[0],
   last: (arr: any[]) => arr?.[arr.length - 1],
@@ -411,6 +424,20 @@ export const objectLib = {
     return out;
   },
 
+  collectObject: (obj: Record<string, any>) => {
+    const out: Record<string, any> = {};
+
+    for (const k in obj) {
+      const v = obj[k];
+
+      if (v !== undefined) {
+        out[k] = v;
+      }
+    }
+
+    return out;
+  },
+
   pick: (obj: Record<string, any>, keys: string[]) => {
     const out: any = {};
     for (const k of keys) if (k in obj) out[k] = obj[k];
@@ -423,8 +450,13 @@ export const objectLib = {
     return out;
   },
 
-  setIfPresent: (key: string, value: any | null | undefined) => {
-    return value == null ? {} : { [key]: value };
+  compact: (obj: Record<string, any>) => {
+    const out: any = {};
+    for (const k in obj) {
+      const v = obj[k];
+      if (v !== undefined && v !== null) out[k] = v;
+    }
+    return out;
   },
 
   setAtPath: (obj: any, path: string, value: any): void => {
@@ -454,6 +486,19 @@ export const objectLib = {
     } else {
       target[lastKey] = value;
     }
+  },
+
+  setIfChanged: (key: string, prev: any, next: any): Record<string, any> => {
+    return Object.is(prev, next) ? {} : { [key]: next };
+  },
+
+  // to be used when null has semantic meaning
+  setIfDefined: (key: string, value: any | undefined): Record<string, any> => {
+    return value === undefined ? {} : { [key]: value };
+  },
+
+  setIfPresent: (key: string, value: any | null | undefined) => {
+    return value == null ? {} : { [key]: value };
   },
 };
 
