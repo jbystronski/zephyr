@@ -47,15 +47,15 @@ export type ServiceRegistry = Record<
 
 export type StandardServices = {
   std: typeof stdLib;
-  date_std: typeof dateLib;
-  string_std: typeof stringLib;
-  math_std: typeof mathLib;
-  array_std: typeof arrayLib;
-  object_std: typeof objectLib;
-  logic_std: typeof logicLib;
-  misc_std: typeof miscLib;
-  extended_json_std: typeof extendedJsonLib;
-  err_std: typeof errLib;
+  date: typeof dateLib;
+  string: typeof stringLib;
+  math: typeof mathLib;
+  array: typeof arrayLib;
+  object: typeof objectLib;
+  logic: typeof logicLib;
+  misc: typeof miscLib;
+  extended_json: typeof extendedJsonLib;
+  err: typeof errLib;
 };
 
 export type ServiceParams<
