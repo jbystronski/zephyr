@@ -48,6 +48,20 @@ export const stdLib = {
   // --- misc ---
   concat: (...parts: any[]) => parts.join(""),
   const: (v: any) => v,
+
+  // Set only if value actually changed
+  setIfChanged: (key: string, prev: any, next: any): Record<string, any> => {
+    return Object.is(prev, next) ? {} : { [key]: next };
+  },
+
+  // to be used when null has semantic meaning
+  setIfDefined: (key: string, value: any | undefined): Record<string, any> => {
+    return value === undefined ? {} : { [key]: value };
+  },
+
+  setIfPresent: (key: string, value: any | null | undefined) => {
+    return value == null ? {} : { [key]: value };
+  },
 };
 
 export const dateLib = {
@@ -310,6 +324,44 @@ export const arrayLib = {
     return [...counts.entries()]
       .filter(([, count]) => count < total)
       .map(([item]) => item);
+  },
+
+  // Extract a specific property from each object in array
+  pluck: <T extends Record<string, any>, K extends keyof T>(
+    arr: T[],
+    key: K,
+  ): T[K][] => {
+    if (!Array.isArray(arr)) return [];
+    return arr.map((item) => item?.[key]).filter((v) => v !== undefined);
+  },
+
+  // Extract multiple properties from each object (returns array of objects)
+  pluckMany: <T extends Record<string, any>, K extends keyof T>(
+    arr: T[],
+    keys: K[],
+  ): Pick<T, K>[] => {
+    if (!Array.isArray(arr)) return [];
+    return arr.map((item) => {
+      const result: any = {};
+      for (const key of keys) {
+        if (key in item) result[key as string] = item[key];
+      }
+      return result;
+    });
+  },
+
+  // Flatten array of objects by extracting a key, then flatten one level
+  flatPluck: <T extends Record<string, any>, K extends keyof T>(
+    arr: T[],
+    key: K,
+  ): T[K] extends any[] ? T[K][number][] : T[K][] => {
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .flatMap((item) => {
+        const value = item?.[key];
+        return Array.isArray(value) ? value : [value];
+      })
+      .filter((v) => v !== undefined);
   },
 };
 
