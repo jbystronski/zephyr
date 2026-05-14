@@ -263,46 +263,6 @@ async function evalExpr(node: ExprNode, ctx: EvalCtx): Promise<any> {
   }
 }
 
-// async function executeStep(
-//   step: StepDef<any>,
-//   ctx: EvalCtx,
-//   observers: WorkflowObserver[],
-// ): Promise<any> {
-//   switch (step.spec) {
-//     case "__init__": {
-//       if (!step.resolve) {
-//         return ctx.input;
-//       }
-//
-//       return evalExpr(step.resolve as ExprNode, ctx);
-//     }
-//
-//     case "__out__": {
-//       if (!step.resolve) {
-//         return undefined;
-//       }
-//
-//       return evalExpr(step.resolve as ExprNode, ctx);
-//     }
-//
-//     case "__join__": {
-//       return undefined;
-//     }
-//
-//     case "__pipe__": {
-//       return runPipeStep(step, ctx, observers);
-//     }
-//
-//     default: {
-//       if (!step.resolve) {
-//         return undefined;
-//       }
-//
-//       return evalExpr(step.resolve as ExprNode, ctx);
-//     }
-//   }
-// }
-//
 async function executeStep(
   step: StepDef<any>,
   ctx: EvalCtx,
@@ -353,7 +313,7 @@ async function executeStep(
     }
 
     if (frame) {
-      frame.output = result;
+      frame.value = result;
       frame.end = Date.now();
     }
 
@@ -473,7 +433,7 @@ export async function executePlan(
         const frame: ExecutionFrame | undefined = hasObservers
           ? {
               stepId: `${step.id}:${step.idx}`,
-              attempts: 1,
+              attempts: 0,
               start: Date.now(),
             }
           : undefined;
@@ -508,15 +468,15 @@ export async function executePlan(
 
           results[step.idx] = result;
 
-          if (frame) {
-            frame.output = result;
-            frame.end = Date.now();
-          }
+          // if (frame) {
+          //   frame.value = result;
+          //   frame.end = Date.now();
+          // }
         } catch (err) {
-          if (frame) {
-            frame.error = err;
-            frame.end = Date.now();
-          }
+          // if (frame) {
+          //   frame.error = err;
+          //   frame.end = Date.now();
+          // }
 
           throw err;
         }
@@ -553,9 +513,9 @@ export function compileStep(step: StepDef<any>): CompiledStep {
         services,
       };
 
-      if (step.pipe) {
-        return runPipeStep(step, ctx, observers);
-      }
+      // if (step.pipe) {
+      //   return runPipeStep(step, ctx, observers);
+      // }
 
       return executeStep(step, ctx, observers, frame);
     },

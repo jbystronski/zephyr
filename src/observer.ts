@@ -21,22 +21,13 @@ export function composeObserver(middleware: any) {
 
 export function useLog(): WorkflowObserver {
   return async ({ frame, stepId }, next) => {
-    // eventStream.emit({
-    //   stepId: frame.stepId,
-    //   state: "start",
-    //   start: frame.start,
-    //   timestamp: frame.start,
-    //   input: frame.input,
-    // });
-
     try {
       const res = await next();
 
       eventStream.emit({
         id: frame.stepId,
-        state: frame.skipped ? "skipped" : "success",
-        input: frame.input,
-        output: frame.output,
+        state: "ok",
+        value: frame.value,
         duration: frame.end! - frame.start,
         attempts: frame.attempts,
         timestamp: Date.now(),

@@ -16,10 +16,8 @@ export type ExecutionFrame = {
   attempts: number;
   start: number;
   end?: number;
-  input?: any;
-  output?: any;
+  value?: any;
   error?: any;
-  skipped?: boolean;
 };
 
 export type Simplify<T> = {

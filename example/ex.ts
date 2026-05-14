@@ -348,7 +348,7 @@ const modCruntime = createRuntimeRoot({
   services,
 });
 
-console.dir(modC.workflows.createObjectsAndFind, { depth: 15 });
+// console.dir(modC.workflows.createObjectsAndFind, { depth: 15 });
 
 // const testOne = await modAruntime.run("createObjects", {
 //   initData: [
@@ -357,19 +357,19 @@ console.dir(modC.workflows.createObjectsAndFind, { depth: 15 });
 //   ],
 // });
 
-const testTwo = await modCruntime.run(
-  "createObjectsAndFind",
-  {
-    initData: [
-      { kind: "bucket", label: "emails" },
-      { kind: "bucket", label: "configs" },
-    ],
-    keyToFind: "emails",
-  },
-  [useLog()],
-);
+// const testTwo = await modCruntime.run(
+//   "createObjectsAndFind",
+//   {
+//     initData: [
+//       { kind: "bucket", label: "emails" },
+//       { kind: "bucket", label: "configs" },
+//     ],
+//     keyToFind: "emails",
+//   },
+//   [useLog()],
+// );
 
-console.dir(testTwo, { depth: 16 });
+// console.dir(testTwo, { depth: 16 });
 
 const modAlt = createModuleFactory<StandardServices>();
 
@@ -398,7 +398,7 @@ const modX = modAlt({
     two: wf<{ items: string[] }>("two")
       .init("i")
       .pipe(
-        "pipe",
+        "pipe to uppercase",
         "map",
         (_) => _.get("i").items,
         (b) =>
@@ -410,7 +410,7 @@ const modX = modAlt({
         items: _.get("i").items,
       }))
       .output((_) => ({
-        topPipe: _.get("pipe"),
+        topPipe: _.get("pipe to uppercase"),
         subPipe: _.get("subflow add prefix to items"),
       })),
   }),
@@ -423,15 +423,15 @@ const modXruntime = createRuntimeRoot({
   services: baseServices.build(),
 });
 
-// const r = await modXruntime.run(
-//   "two",
-//   {
-//     items: ["dog", "cat", "fish"],
-//   },
-//   [useLog()],
-// );
+const r = await modXruntime.run(
+  "two",
+  {
+    items: ["dog", "cat", "fish"],
+  },
+  [useLog()],
+);
 
-// console.log(r);
+console.log(r);
 
 // const r = await modCruntime.run("testArray", {}, [useLog()]);
 //
