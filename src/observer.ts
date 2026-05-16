@@ -1,5 +1,5 @@
 import { eventStream } from "./event-stream.js";
-import { ServiceRegistry, WorkflowObserver } from "./types.js";
+import { WorkflowObserver } from "./types.js";
 
 export function composeObserver(middleware: any) {
   return (ctx: any, core: any) => {

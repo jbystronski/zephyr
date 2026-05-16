@@ -68,4 +68,21 @@ export type ServiceReturn<
   M extends keyof S[K],
 > = Awaited<ReturnType<S[K][M]>>;
 
-// export type Guard = number | { not: number };
+export type ServiceMeta = {
+  async?: boolean;
+};
+
+export type ServiceMetaRule = {
+  async?: boolean;
+};
+
+export type ServiceMetaRegistry<S extends Record<string, any>> = {
+  [K in keyof S]?: {
+    service?: ServiceMetaRule;
+    methods?: Record<string, ServiceMeta>;
+    patterns?: Array<{
+      match: RegExp;
+      meta: ServiceMeta;
+    }>;
+  };
+};

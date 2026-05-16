@@ -17,12 +17,6 @@ export type ExprNode =
       args: ExprNode[];
     };
 
-// export type ExprServiceCtx<S extends ServiceRegistry> = {
-//   [SK in keyof S]: {
-//     [MK in keyof S[SK]]: (...args: Parameters<S[SK][MK]>) => ExprNode;
-//   };
-// };
-
 export type ExprServiceCtx<S extends ServiceRegistry> = {
   [SK in keyof S]: {
     [MK in keyof S[SK]]: (

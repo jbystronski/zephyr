@@ -10,6 +10,7 @@ import {
   stdLib,
   stringLib,
 } from "./services.js";
+import { ServiceMeta, ServiceMetaRegistry, ServiceMetaRule } from "./types.js";
 import { Module } from "./workflow-module.js";
 let idCounter = 0;
 
@@ -69,6 +70,7 @@ export class ServiceBuilder<S extends ServiceMap> {
   add<K extends string, T>(
     key: K extends keyof S ? never : K,
     service: T,
+    options?: { meta?: Record<string, boolean> },
   ): ServiceBuilder<S & { [P in K]: T }> {
     return new ServiceBuilder({
       ...this.services,
@@ -96,3 +98,58 @@ export const baseServices = createServices()
   .add("misc", miscLib)
   .add("extended_json", extendedJsonLib)
   .add("err", errLib);
+
+export class ServiceMetaBuilder<
+  S extends Record<string, any> = any,
+  M extends ServiceMetaRegistry<S> = ServiceMetaRegistry<S>,
+> {
+  constructor(private meta: M = {} as M) {}
+
+  service<K extends keyof S>(service: K, rule: ServiceMetaRule) {
+    return new ServiceMetaBuilder<S, M>({
+      ...this.meta,
+      [service]: {
+        ...(this.meta[service] ?? {}),
+        service: rule,
+      },
+    } as M);
+  }
+
+  method<K extends keyof S>(
+    service: K,
+    method: keyof S[K] & string,
+    rule: ServiceMeta,
+  ) {
+    return new ServiceMetaBuilder<S, M>({
+      ...this.meta,
+      [service]: {
+        ...(this.meta[service] ?? {}),
+        methods: {
+          ...(this.meta[service]?.methods ?? {}),
+          [method]: rule,
+        },
+      },
+    } as M);
+  }
+
+  pattern<K extends keyof S>(service: K, match: RegExp, rule: ServiceMeta) {
+    return new ServiceMetaBuilder<S, M>({
+      ...this.meta,
+      [service]: {
+        ...(this.meta[service] ?? {}),
+        patterns: [
+          ...(this.meta[service]?.patterns ?? []),
+          { match, meta: rule },
+        ],
+      },
+    } as M);
+  }
+
+  build() {
+    return this.meta;
+  }
+}
+
+export function createMeta<S extends Record<string, any> = any>() {
+  return new ServiceMetaBuilder<S>();
+}

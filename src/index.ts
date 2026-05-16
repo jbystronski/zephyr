@@ -7,6 +7,7 @@ export {
   exposeAll,
   exposeAllAs,
   createServices,
+  createMeta,
   baseServices,
 } from "./utils.js";
 export {

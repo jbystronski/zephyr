@@ -136,10 +136,10 @@ const testPipe = createMod({
 
     const test = wf<{ elements: string[]; another: string }>("pipeElements")
       .init("init")
-      .seq("add_animal", (ctx) =>
-        ctx.s1.addAnimal({
-          initArray: ctx.get("init").elements,
-          newAnimal: ctx.get("init").another,
+      .seq("add_animal", (_) =>
+        _.s1.addAnimal({
+          initArray: _.get("init").elements,
+          newAnimal: _.get("init").another,
         }),
       )
 
@@ -175,6 +175,9 @@ const testPipe = createMod({
 const s = baseServices
   .add("s1", {
     addAnimal: (input: { initArray: string[]; newAnimal: string }) => {
+      console.log("new animal", input.newAnimal);
+      console.log("what is initArray in add animal");
+      console.log(input.initArray);
       const newArr = [...input.initArray, input.newAnimal];
       return newArr;
     },

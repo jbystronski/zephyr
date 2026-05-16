@@ -25,22 +25,23 @@ export type PipeNode = {
   type: "pipe";
   input: ExprNode;
   mode: PipeMode;
+  steps: StepDef<any>[];
 
-  workflow: {
-    _id: string;
-    name: string;
-
-    steps: StepDef<any>[];
-
-    //TODO: add guards here?
-    // guards: number[]
-    entrySteps: StepDef<any>[];
-    endSteps: StepDef<any>[];
-
-    aliasMap: {
-      results: Record<string, string>;
-    };
-  };
+  // workflow: {
+  //   _id: string;
+  //   name: string;
+  //
+  //   steps: StepDef<any>[];
+  //
+  //   //TODO: add guards here?
+  //   // guards: number[]
+  //   entrySteps: StepDef<any>[];
+  //   endSteps: StepDef<any>[];
+  //
+  //   aliasMap: {
+  //     results: Record<string, string>;
+  //   };
+  // };
 
   entryMap: Record<string, string>;
   exitMap: number[];
@@ -307,16 +308,6 @@ export class WorkflowBuilder<
       (s) => s.spec !== "__init__" && !hasDependents.has(s.idx),
     );
 
-    // const pipeInputAst = toNode(
-    //   input({
-    //     get: ((key: string) => {
-    //       const idx = this.idToIdx[key];
-    //       if (idx === undefined) throw new Error(`Unresolved idx`);
-    //       return createGetter(idx);
-    //     }) as any,
-    //   }),
-    // );
-    //
     const pipeExpr = input ? input(createExprCtx(this.idToIdx)) : [];
 
     const pipeInputAst = toNode(pipeExpr);
@@ -353,8 +344,9 @@ export class WorkflowBuilder<
       pipe: {
         type: "pipe",
         mode,
-        workflow: subWf,
+
         input: pipeInputAst,
+        steps: subWf.steps,
         entryMap: Object.fromEntries(entrySteps.map((s) => [s.id, s.idx])),
         exitMap: endSteps.map((s) => s.idx),
       },

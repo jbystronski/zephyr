@@ -1,7 +1,12 @@
-import { compileModule, executePlan } from "./compiler.js";
-
+import { compileModule } from "./ast-compiler.js";
+import { executePlan } from "./executor.js";
 import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
-import { ServiceRegistry, Simplify, WorkflowObserver } from "./types.js";
+import {
+  ServiceMetaRegistry,
+  ServiceRegistry,
+  Simplify,
+  WorkflowObserver,
+} from "./types.js";
 
 import { createWorkflow, WorkflowDef } from "./workflow-composer.js";
 
@@ -192,11 +197,13 @@ function createModule<
 export function createRuntimeRoot<M extends Module<any, any, any, any>>({
   module,
   services,
+  meta,
 }: {
   module: M;
   services: RuntimeServices<M>;
+  meta?: ServiceMetaRegistry<any>;
 }) {
-  const compiled = compileModule(module);
+  const compiled = compileModule(module, services, meta);
 
   return {
     run: async <K extends keyof M["__public"]>(
@@ -213,15 +220,9 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
         throw new Error(`Workflow not found: ${String(workflowId)}`);
       }
 
-      const results = new Array(plan.maxIdx + 1);
+      // const results = new Array(plan.maxIdx + 1);
 
-      const output = await executePlan(
-        plan,
-        input,
-        services,
-        observers,
-        results,
-      );
+      const output = await executePlan(plan, input, observers);
 
       return {
         output,
