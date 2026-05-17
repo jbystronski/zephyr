@@ -72,7 +72,25 @@ const createMod = createModuleFactory<
   }
 >();
 
+const subMod = createMod({
+  define: ({ wf }) => ({
+    addTen: wf<{ someNumbers: number[] }>("add ten")
+      .init("i")
+      .pipe(
+        "add 10 pipe",
+        "map",
+        (_) => _.get("i").someNumbers,
+        (b) =>
+          b
+            .init("processed entry")
+            .seq("add", (_) => _.math.add(_.get("processed entry"), 10)),
+      )
+      .output((_) => _.get("add 10 pipe")),
+  }),
+});
+
 const testPipe = createMod({
+  use: { subMod },
   define: ({ wf }) => {
     const findFirstArcticBird = wf<{ data: Transformable[] }>(
       "firstArcticBirdTest",
@@ -163,6 +181,9 @@ const testPipe = createMod({
       .output(({ get }) => get("reptilesOnly"));
 
     const test = wf<{
+      nestedArr: { name: string; arr: string[] }[];
+      secondArr: { name: string; arr: string[] }[];
+      nums: number[];
       elements: string[];
       from: Date;
       someSet: Set<string>;
@@ -170,22 +191,72 @@ const testPipe = createMod({
       complex: Record<string, any>[];
     }>("pipeElements")
       .init("init")
-      .seq("add suff", (_) => _.std.concat("dog", _.get("init").another))
-      .seq("append", ({ get, array: { append: app } }) =>
-        app(app(app(get("init").elements, "ant"), "moose"), "snake"),
+      // .seq("add suff", (_) => _.std.concat("dog", _.get("init").another))
+      // .seq("append", ({ get, array: { append: app } }) =>
+      //   app(app(app(get("init").elements, "ant"), "moose"), "snake"),
+      // )
+      .sub("adding 10", "subMod.addTen", (_) => ({
+        someNumbers: _.get("init").nums,
+      }))
+      .parallel(
+        (b) =>
+          b.pipe(
+            "first P",
+            "map",
+            (_) => _.get("init").nestedArr,
+            (b) =>
+              b
+                .init("p entry")
+                .seq("suffix", (_) => _.std.concat(_.get("p entry").name, "^"))
+                .pipe(
+                  "nested pipe",
+                  "map",
+                  (_) => _.get("p entry").arr,
+                  (b) =>
+                    b
+                      .init("nested p entry")
+                      .seq("add pref", (_) =>
+                        _.std.concat(_.get("nested p entry"), "<<"),
+                      ),
+                )
+                .seq("final", (_) => ({
+                  outer: _.get("suffix"),
+                  arr: _.get("nested pipe"),
+                })),
+          ),
+        (b) =>
+          b.pipe(
+            "second P",
+            "map",
+            (_) => _.get("init").secondArr,
+            (b) =>
+              b
+                .init("second p entry")
+                .seq("suffix", (_) =>
+                  _.std.concat(_.get("second p entry").name, "$"),
+                )
+                .pipe(
+                  "nested second pipe",
+                  "map",
+                  (_) => _.get("second p entry").arr,
+                  (b) =>
+                    b
+                      .init("nested second p entry")
+                      .seq("add pref again", (_) =>
+                        _.std.concat(_.get("nested second p entry"), ">>"),
+                      ),
+                )
+                .seq("final second", (_) => ({
+                  outer: _.get("suffix"),
+                  arr: _.get("nested second pipe"),
+                })),
+          ),
       )
-      .seq("AAAA", (_) =>
-        _.std.const({ one: "DOG", two: _.get("init").another }),
-      )
-      .seq("add_animal", (_) =>
-        _.s1.addAnimal({
-          initArray: _.get("init").elements,
-          newAnimal: "CAT",
-        }),
-      )
+
+      .join()
       .output((_) => ({
-        added: _.get("add_animal"),
-        appended: _.get("append"),
+        nestedPres: _.get("first P"),
+        nestedSecond: _.get("second P"),
       }));
 
     return {
@@ -221,6 +292,16 @@ console.dir(testPipe.__public.test, { depth: 12 });
 const r = await r0.run(
   "test",
   {
+    nestedArr: [
+      { name: "wolf", arr: ["leaf", "tree", "cloud"] },
+      { name: "dog", arr: ["dirt", "sea", "snow"] },
+    ],
+    secondArr: [
+      { name: "bird", arr: ["nest", "tree", "branch"] },
+      { name: "fly", arr: ["web", "cellar", "shadow"] },
+    ],
+
+    nums: [4, 233, 112],
     someSet: new Set<string>(["ab", "cd"]),
     from: new Date(),
     elements: ["dog"],

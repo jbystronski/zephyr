@@ -19,7 +19,8 @@ export type CompiledStep = {
 
 export type StepRuntimeCtx = {
   input: any;
-  pipeIter: number | undefined;
+  // pipeIter: number | undefined;
+  pipeStack: number[];
   results: any[][];
   observers: any[];
   frame?: ExecutionFrame;
@@ -35,7 +36,8 @@ export type CompilerCtx<S = any, M = any> = {
 };
 
 export function getIter(rt: StepRuntimeCtx): number {
-  return rt.pipeIter ?? 0;
+  // return rt.pipeIter ?? 0;
+  return rt.pipeStack[rt.pipeStack.length - 1] ?? 0;
 }
 
 export function ensureSlot(results: any[][], slot: number) {
@@ -308,10 +310,18 @@ function compilePipeStep(
   // -----------------------------------
   // compile inner pipe steps
   // -----------------------------------
+  const pipeSteps = step.pipe.steps.map((s) => {
+    const childSlot = slotMap.get(s.idx)!;
 
-  const pipeSteps = step.pipe.steps.map((s) =>
-    compileStep(s, ctx, slotMap.get(s.idx)!, slotMap),
-  );
+    if (s.spec === "__pipe__") {
+      return compilePipeStep(s, ctx, childSlot, slotMap);
+    }
+
+    return compileStep(s, ctx, childSlot, slotMap);
+  });
+  // const pipeSteps = step.pipe.steps.map((s) =>
+  //   compileStep(s, ctx, slotMap.get(s.idx)!, slotMap),
+  // );
 
   // -----------------------------------
   // execution levels
@@ -337,13 +347,24 @@ function compilePipeStep(
 
   async function runIteration(rt: StepRuntimeCtx, item: any, iter: number) {
     rt.input = item;
-    rt.pipeIter = iter;
+    // rt.pipeIter = iter;
+    rt.pipeStack.push(iter);
 
-    for (const level of levels) {
-      await Promise.all(level.map((s) => s.run(rt)));
+    try {
+      for (const level of levels) {
+        await Promise.all(level.map((s) => s.run(rt)));
+      }
+
+      return readResult(rt, terminalSlot);
+    } finally {
+      rt.pipeStack.pop();
     }
 
-    return readResult(rt, terminalSlot);
+    // for (const level of levels) {
+    //   await Promise.all(level.map((s) => s.run(rt)));
+    // }
+    //
+    // return readResult(rt, terminalSlot);
   }
 
   // -----------------------------------
@@ -376,7 +397,7 @@ function compilePipeStep(
             res[i] = out;
           }
 
-          rt.pipeIter = undefined;
+          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, res);
 
@@ -394,7 +415,7 @@ function compilePipeStep(
             }
           }
 
-          rt.pipeIter = undefined;
+          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, res);
 
@@ -410,7 +431,7 @@ function compilePipeStep(
             const out = await runIteration(rt, list[i], i);
 
             if (out) {
-              rt.pipeIter = undefined;
+              // rt.pipeIter = undefined;
 
               writeResult(rt, slot, list[i]);
 
@@ -418,7 +439,7 @@ function compilePipeStep(
             }
           }
 
-          rt.pipeIter = undefined;
+          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, undefined);
 
@@ -434,7 +455,7 @@ function compilePipeStep(
             const out = await runIteration(rt, list[i], i);
 
             if (out) {
-              rt.pipeIter = undefined;
+              // rt.pipeIter = undefined;
 
               writeResult(rt, slot, true);
 
@@ -442,7 +463,7 @@ function compilePipeStep(
             }
           }
 
-          rt.pipeIter = undefined;
+          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, false);
 
@@ -458,7 +479,7 @@ function compilePipeStep(
             const out = await runIteration(rt, list[i], i);
 
             if (!out) {
-              rt.pipeIter = undefined;
+              // rt.pipeIter = undefined;
 
               writeResult(rt, slot, false);
 
@@ -466,7 +487,7 @@ function compilePipeStep(
             }
           }
 
-          rt.pipeIter = undefined;
+          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, true);
 
@@ -488,7 +509,7 @@ function compilePipeStep(
             }
           }
 
-          rt.pipeIter = undefined;
+          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, count);
 

@@ -112,7 +112,8 @@ export async function executePlan(
   const rootRt: StepRuntimeCtx = {
     input,
     results,
-    pipeIter: 0,
+    // pipeIter: 0,
+    pipeStack: [],
     observers,
     frame: undefined,
   };
