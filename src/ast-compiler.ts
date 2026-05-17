@@ -56,6 +56,16 @@ export function readResult(rt: StepRuntimeCtx, slot: number) {
   return rt.results[slot]?.[iter];
 }
 
+function isPlainObject(value: any): boolean {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+
+  const proto = Object.getPrototypeOf(value);
+
+  return proto === Object.prototype || proto === null;
+}
+
 function isExprNode(v: any): v is ExprNode {
   return (
     v &&
@@ -80,7 +90,7 @@ function compileConst(value: any, ctx: CompilerCtx, slotMap: SlotMap): any {
     return value.map((v) => compileConst(v, ctx, slotMap));
   }
 
-  if (typeof value === "object") {
+  if (isPlainObject(value)) {
     const out: any = {};
     for (const k in value) {
       out[k] = compileConst(value[k], ctx, slotMap);
@@ -114,7 +124,7 @@ async function evalExpr(value: any, rt: StepRuntimeCtx): Promise<any> {
     return Promise.all(value.map((v) => evalExpr(v, rt)));
   }
 
-  if (typeof value === "object") {
+  if (isPlainObject(value)) {
     const out: any = {};
 
     for (const k in value) {

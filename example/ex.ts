@@ -11,7 +11,7 @@ import {
 } from "../src";
 
 eventStream.subscribe((ev: any) => {
-  console.dir(ev, { depth: 3 });
+  console.dir(ev, { depth: 12 });
 });
 type Transformable = {
   kind: "mammal" | "reptile" | "bird";
@@ -162,7 +162,13 @@ const testPipe = createMod({
       )
       .output(({ get }) => get("reptilesOnly"));
 
-    const test = wf<{ elements: string[]; another: string }>("pipeElements")
+    const test = wf<{
+      elements: string[];
+      from: Date;
+      someSet: Set<string>;
+      another: string;
+      complex: Record<string, any>[];
+    }>("pipeElements")
       .init("init")
       .seq("add suff", (_) => _.std.concat("dog", _.get("init").another))
       .seq("append", ({ get, array: { append: app } }) =>
@@ -212,8 +218,26 @@ const r0 = createRuntimeRoot({
 
 console.dir(testPipe.__public.test, { depth: 12 });
 
-const r = await r0.run("test", { elements: ["dog"], another: "fish" }, [
-  useLog(),
-]);
+const r = await r0.run(
+  "test",
+  {
+    someSet: new Set<string>(["ab", "cd"]),
+    from: new Date(),
+    elements: ["dog"],
+    another: "fish",
+    complex: [
+      {
+        topArr: [false, true, true],
+        entities: [
+          {
+            name: "human",
+            planet: "earth",
+          },
+        ],
+      },
+    ],
+  },
+  [useLog()],
+);
 
 console.log(r);
