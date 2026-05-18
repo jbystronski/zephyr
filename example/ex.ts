@@ -191,10 +191,10 @@ const testPipe = createMod({
       complex: Record<string, any>[];
     }>("pipeElements")
       .init("init")
-      // .seq("add suff", (_) => _.std.concat("dog", _.get("init").another))
-      // .seq("append", ({ get, array: { append: app } }) =>
-      //   app(app(app(get("init").elements, "ant"), "moose"), "snake"),
-      // )
+      .seq("add suff", (_) => _.std.concat("dog", _.get("init").another))
+      .seq("append", ({ get, array: { append: app } }) =>
+        app(app(app(get("init").elements, "ant"), "moose"), "snake"),
+      )
       .sub("adding 10", "subMod.addTen", (_) => ({
         someNumbers: _.get("init").nums,
       }))
@@ -207,7 +207,9 @@ const testPipe = createMod({
             (b) =>
               b
                 .init("p entry")
-                .seq("suffix", (_) => _.std.concat(_.get("p entry").name, "^"))
+                .seq("suffix", (_) =>
+                  _.std.concat(_.get("p entry").name, "!!!!!"),
+                )
                 .pipe(
                   "nested pipe",
                   "map",
@@ -216,7 +218,7 @@ const testPipe = createMod({
                     b
                       .init("nested p entry")
                       .seq("add pref", (_) =>
-                        _.std.concat(_.get("nested p entry"), "<<"),
+                        _.std.concat(_.get("nested p entry"), _.get("suffix")),
                       ),
                 )
                 .seq("final", (_) => ({
@@ -255,11 +257,32 @@ const testPipe = createMod({
 
       .join()
       .output((_) => ({
-        nestedPres: _.get("first P"),
+        addingTen: _.get("adding 10"),
         nestedSecond: _.get("second P"),
+        nestedPres: _.get("first P"),
       }));
 
+    const filterSome = wf<{ all: string[]; selected: string[] }>("filter some")
+      .init("i")
+      .pipe(
+        "filtered",
+        "filter",
+        (_) => _.get("i").selected,
+        (b) =>
+          b.init("x").pipe(
+            "some",
+            "some",
+            (_) => _.get("i").all,
+            (b) =>
+              b
+                .init("y")
+                .seq("check", (_) => _.logic.eq(_.get("x"), _.get("y"))),
+          ),
+      )
+      .output((_) => _.get("filtered"));
+
     return {
+      filterSome,
       test,
       findFirstArcticBird,
       someAreTropical,
@@ -322,3 +345,14 @@ const r = await r0.run(
 );
 
 console.log(r);
+
+const r2 = await r0.run(
+  "filterSome",
+  {
+    selected: ["1", "2"],
+    all: ["1", "2", "4", "6"],
+  },
+  [useLog()],
+);
+
+console.log(r2);

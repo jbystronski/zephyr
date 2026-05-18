@@ -4,7 +4,7 @@ import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
 import { ExecutionFrame } from "./types.js";
 import { StepDef, WorkflowDef } from "./workflow-composer.js";
 
-export type ResultsArray = any[];
+export type ResultsArray = Map<number, any>;
 
 type SlotMap = Map<number, number>;
 
@@ -19,9 +19,10 @@ export type CompiledStep = {
 
 export type StepRuntimeCtx = {
   input: any;
-  // pipeIter: number | undefined;
+
   pipeStack: number[];
-  results: any[][];
+  results: Map<number, any>;
+
   observers: any[];
   frame?: ExecutionFrame;
 };
@@ -35,27 +36,16 @@ export type CompilerCtx<S = any, M = any> = {
   meta: M;
 };
 
-export function getIter(rt: StepRuntimeCtx): number {
-  // return rt.pipeIter ?? 0;
-  return rt.pipeStack[rt.pipeStack.length - 1] ?? 0;
-}
-
 export function ensureSlot(results: any[][], slot: number) {
   results[slot] ??= [];
 }
 
 export function writeResult(rt: StepRuntimeCtx, slot: number, value: any) {
-  const iter = getIter(rt);
-
-  ensureSlot(rt.results, slot);
-
-  rt.results[slot][iter] = value;
+  rt.results.set(slot, value);
 }
 
 export function readResult(rt: StepRuntimeCtx, slot: number) {
-  const iter = getIter(rt);
-
-  return rt.results[slot]?.[iter];
+  return rt.results.get(slot);
 }
 
 function isPlainObject(value: any): boolean {
@@ -146,9 +136,6 @@ export function compileExpr(
 ): CompiledExpr {
   switch (node.type) {
     case "const": {
-      // const compiled = compileConst(node.value, ctx, slotMap);
-      // return () => compiled;
-
       const raw = node.value;
       const compiled = compileConst(raw, ctx, slotMap);
       return (rt) => evalExpr(compiled, rt);
@@ -319,9 +306,6 @@ function compilePipeStep(
 
     return compileStep(s, ctx, childSlot, slotMap);
   });
-  // const pipeSteps = step.pipe.steps.map((s) =>
-  //   compileStep(s, ctx, slotMap.get(s.idx)!, slotMap),
-  // );
 
   // -----------------------------------
   // execution levels
@@ -344,27 +328,19 @@ function compilePipeStep(
   // -----------------------------------
   // iteration executor
   // -----------------------------------
-
   async function runIteration(rt: StepRuntimeCtx, item: any, iter: number) {
-    rt.input = item;
-    // rt.pipeIter = iter;
-    rt.pipeStack.push(iter);
+    const childRt: StepRuntimeCtx = {
+      ...rt,
+      input: item,
 
-    try {
-      for (const level of levels) {
-        await Promise.all(level.map((s) => s.run(rt)));
-      }
+      pipeStack: [...rt.pipeStack, iter],
+    };
 
-      return readResult(rt, terminalSlot);
-    } finally {
-      rt.pipeStack.pop();
+    for (const level of levels) {
+      await Promise.all(level.map((s) => s.run(childRt)));
     }
 
-    // for (const level of levels) {
-    //   await Promise.all(level.map((s) => s.run(rt)));
-    // }
-    //
-    // return readResult(rt, terminalSlot);
+    return readResult(childRt, terminalSlot);
   }
 
   // -----------------------------------
@@ -397,8 +373,6 @@ function compilePipeStep(
             res[i] = out;
           }
 
-          // rt.pipeIter = undefined;
-
           writeResult(rt, slot, res);
 
           return res;
@@ -415,8 +389,6 @@ function compilePipeStep(
             }
           }
 
-          // rt.pipeIter = undefined;
-
           writeResult(rt, slot, res);
 
           return res;
@@ -431,15 +403,11 @@ function compilePipeStep(
             const out = await runIteration(rt, list[i], i);
 
             if (out) {
-              // rt.pipeIter = undefined;
-
               writeResult(rt, slot, list[i]);
 
               return list[i];
             }
           }
-
-          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, undefined);
 
@@ -455,15 +423,11 @@ function compilePipeStep(
             const out = await runIteration(rt, list[i], i);
 
             if (out) {
-              // rt.pipeIter = undefined;
-
               writeResult(rt, slot, true);
 
               return true;
             }
           }
-
-          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, false);
 
@@ -479,15 +443,11 @@ function compilePipeStep(
             const out = await runIteration(rt, list[i], i);
 
             if (!out) {
-              // rt.pipeIter = undefined;
-
               writeResult(rt, slot, false);
 
               return false;
             }
           }
-
-          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, true);
 
@@ -508,8 +468,6 @@ function compilePipeStep(
               count++;
             }
           }
-
-          // rt.pipeIter = undefined;
 
           writeResult(rt, slot, count);
 
@@ -551,7 +509,6 @@ export function compileWorkflow(
 
   const slotMap = assignSlots(flatSteps);
 
-  // const compiledLevels = buildLevels(workflow.steps).map((level) =>
   const compiledLevels = buildLevels(workflow.steps).map((level) =>
     level.map((step) => {
       const slot = slotMap.get(step.idx)!;

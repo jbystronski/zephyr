@@ -95,9 +95,11 @@ export async function executePlan(
   input: any,
   observers: WorkflowObserver[],
 ) {
-  const results: ResultsArray = new Array(plan.maxSlot);
+  // const results: ResultsArray = new Array(plan.maxSlot);
 
   const hasObservers = observers.length > 0;
+
+  const results: ResultsArray = new Map<number, any>();
 
   const runWithObservers = hasObservers ? composeObserver(observers) : null;
 
@@ -112,7 +114,7 @@ export async function executePlan(
   const rootRt: StepRuntimeCtx = {
     input,
     results,
-    // pipeIter: 0,
+
     pipeStack: [],
     observers,
     frame: undefined,
@@ -215,6 +217,8 @@ export async function executePlan(
   } else {
     output = undefined;
   }
+
+  console.log("result", rootRt.results);
 
   return output;
 }
