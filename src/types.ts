@@ -86,3 +86,102 @@ export type ServiceMetaRegistry<S extends Record<string, any>> = {
     }>;
   };
 };
+
+export type StepSpec =
+  | "__init__"
+  | "__eval__"
+  | "__out__"
+  | "__pipe__"
+  | "__join__";
+
+export type PipeMode = "map" | "filter" | "find" | "some" | "every" | "count";
+
+// -----------------------------------
+// AST
+// -----------------------------------
+
+export type Primitive = string | number | boolean | null;
+
+export type Expr =
+  | Primitive
+  | Expr[]
+  | { [k: string]: Expr }
+  | RefExpr
+  | CallExpr;
+
+export type RefExpr = {
+  __ref: number;
+  __path?: (string | number | symbol)[];
+};
+
+export type CallExpr = {
+  __service: string;
+  __method: string;
+  __args?: Expr[];
+};
+
+export type ExprValue<T> = T & {
+  __expr: Expr;
+};
+
+export type GetterProxy<T> = T & {
+  __expr: Expr;
+};
+
+export type ExprServiceCtx<S extends ServiceRegistry> = {
+  [SK in keyof S]: {
+    [MK in keyof S[SK]]: (
+      ...args: Parameters<S[SK][MK]>
+    ) => ExprValue<Awaited<ReturnType<S[SK][MK]>>>;
+  };
+};
+
+export type ExprCtx<S extends ServiceRegistry, Results> = ExprServiceCtx<S> & {
+  get<K extends keyof Results>(key: K): Results[K];
+};
+
+// -----------------------------------
+// Compiler / Executor
+// -----------------------------------
+
+export type CompilerCtx<S = any, M = any> = {
+  services: S;
+  meta: M;
+};
+
+export type ResultsArray = any[] & { __parent?: ResultsArray };
+
+export type ExecutionPlan = {
+  levels: CompiledStep[][];
+  outputIndex?: number;
+  exitIndexes: number[];
+  maxIndex: number;
+};
+
+export type CompiledStep = {
+  id: string;
+  idx: number; // graph id (debug)
+  deps: number[];
+  guards: number[];
+  spec?: StepSpec;
+  resolve: CompiledExpr | null;
+  pipe?: {
+    mode: PipeMode;
+    plan: ExecutionPlan;
+  };
+};
+
+export type StepRuntimeCtx = {
+  input: any;
+  results: ResultsArray;
+  observers: any[];
+  frame?: ExecutionFrame;
+};
+
+export type CompiledStepRuntime = (ctx: StepRuntimeCtx) => Promise<any>;
+
+export type CompiledExpr =
+  | any
+  | CompiledExpr[]
+  | Record<string, any>
+  | ((rt: StepRuntimeCtx) => any | Promise<any>);

@@ -70,7 +70,7 @@ describe("Retry handling at action level", () => {
 
     const r0 = createRuntimeRoot({ module: parent, services: { actions } });
 
-    const res = await r0.run("test", { x: 1, y: 2 }, [useLog()]);
+    const res = await r0.run("test", { x: 1, y: 2 }, []);
 
     // ✅ Verify retry counts
     expect(retriesA).toBe(2); // retried once

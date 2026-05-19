@@ -198,6 +198,20 @@ const testPipe = createMod({
       .sub("adding 10", "subMod.addTen", (_) => ({
         someNumbers: _.get("init").nums,
       }))
+      .seq("deep nested expr", (_) => ({
+        first: [2, 3],
+        second: {
+          foo: _.get("init").nestedArr[0].name,
+          bar: {
+            baz: _.math.add(33, _.math.mul(2, _.math.div(100, 2))),
+            inlinedCalls: [_.math.abs(22), _.math.neg(99)],
+            concatenated: _.string.join(
+              [_.get("init").secondArr[0].arr[0], "monkey"],
+              "~",
+            ),
+          },
+        },
+      }))
       .parallel(
         (b) =>
           b.pipe(
@@ -257,6 +271,7 @@ const testPipe = createMod({
 
       .join()
       .output((_) => ({
+        deep: _.get("deep nested expr"),
         addingTen: _.get("adding 10"),
         nestedSecond: _.get("second P"),
         nestedPres: _.get("first P"),
@@ -305,12 +320,14 @@ const s = baseServices
 
   .build();
 
+console.dir(testPipe.__public.test, { depth: 16 });
+
 const r0 = createRuntimeRoot({
   module: testPipe,
   services: s,
 });
 
-console.dir(testPipe.__public.test, { depth: 12 });
+// console.dir(testPipe.__public.test, { depth: 12 });
 
 const r = await r0.run(
   "test",
@@ -344,15 +361,15 @@ const r = await r0.run(
   [useLog()],
 );
 
-console.log(r);
-
-const r2 = await r0.run(
-  "filterSome",
-  {
-    selected: ["1", "2"],
-    all: ["1", "2", "4", "6"],
-  },
-  [useLog()],
-);
-
-console.log(r2);
+console.dir(r, { depth: 16 });
+//
+// const r2 = await r0.run(
+//   "filterSome",
+//   {
+//     selected: ["1", "2"],
+//     all: ["1", "2", "4", "6"],
+//   },
+//   [useLog()],
+// );
+//
+// console.log(r2);

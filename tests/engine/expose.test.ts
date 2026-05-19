@@ -43,7 +43,7 @@ describe("Expose", () => {
       services: { ...registryA },
     });
 
-    const res = await root.run("aliased", { a: 10, b: 10 }, [useLog()]);
+    const res = await root.run("aliased", { a: 10, b: 10 }, []);
 
     expect(res.output).toBe(20);
   });

@@ -1,157 +1,67 @@
-import { ExprNode } from "./ast.js";
-import { ExecutionPlan } from "./executor.js";
+import { isCallExpr, isPlainObject, isRefExpr } from "./ast.js";
+import { composeObserver } from "./observer.js";
 import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
-import { ExecutionFrame } from "./types.js";
+import {
+  CallExpr,
+  CompiledExpr,
+  CompiledStep,
+  CompilerCtx,
+  ExecutionFrame,
+  ExecutionPlan,
+  Expr,
+  RefExpr,
+  ResultsArray,
+  StepRuntimeCtx,
+} from "./types.js";
 import { StepDef, WorkflowDef } from "./workflow-composer.js";
 
-export type ResultsArray = Map<number, any>;
+export function readResult(results: ResultsArray, idx: number): any {
+  let current: ResultsArray = results;
 
-type SlotMap = Map<number, number>;
+  while (current) {
+    if (Object.prototype.hasOwnProperty.call(current, idx)) {
+      return current[idx];
+    }
 
-export type CompiledStep = {
-  id: string;
-  idx: number; // graph id (debug)
-  slot: number; // VM register index (runtime)
-  deps: number[];
-  guards: number[];
-  run: CompiledStepRuntime;
-};
-
-export type StepRuntimeCtx = {
-  input: any;
-
-  pipeStack: number[];
-  results: Map<number, any>;
-
-  observers: any[];
-  frame?: ExecutionFrame;
-};
-
-export type CompiledStepRuntime = (ctx: StepRuntimeCtx) => Promise<any>;
-
-export type CompiledExpr = (ctx: StepRuntimeCtx) => any | Promise<any>;
-
-export type CompilerCtx<S = any, M = any> = {
-  services: S;
-  meta: M;
-};
-
-export function ensureSlot(results: any[][], slot: number) {
-  results[slot] ??= [];
-}
-
-export function writeResult(rt: StepRuntimeCtx, slot: number, value: any) {
-  rt.results.set(slot, value);
-}
-
-export function readResult(rt: StepRuntimeCtx, slot: number) {
-  return rt.results.get(slot);
-}
-
-function isPlainObject(value: any): boolean {
-  if (value === null || typeof value !== "object") {
-    return false;
+    current = current.__parent!;
   }
 
-  const proto = Object.getPrototypeOf(value);
-
-  return proto === Object.prototype || proto === null;
+  return undefined;
 }
 
-function isExprNode(v: any): v is ExprNode {
-  return (
-    v &&
-    typeof v === "object" &&
-    typeof v.type === "string" &&
-    (v.type === "const" || v.type === "get" || v.type === "call")
-  );
-}
-
-// if (isExprNode(value)) {
-//   return value; // DO NOT compile here
+// function isExprNode(v: any): v is ExprNode {
+//   return (
+//     v &&
+//     typeof v === "object" &&
+//     typeof v.type === "string" &&
+//     (v.type === "const" || v.type === "get" || v.type === "call")
+//   );
 // }
 
-function compileConst(value: any, ctx: CompilerCtx, slotMap: SlotMap): any {
-  if (value == null) return value;
+function compileRef(expr: RefExpr): (rt: StepRuntimeCtx) => any {
+  const ref = expr.__ref;
+  const path = expr.__path ?? [];
 
-  if (isExprNode(value)) {
-    return compileExpr(value, ctx, slotMap);
-  }
+  switch (path.length) {
+    case 0:
+      return (rt) => readResult(rt.results, ref);
 
-  if (Array.isArray(value)) {
-    return value.map((v) => compileConst(v, ctx, slotMap));
-  }
+    case 1: {
+      const p0 = path[0];
 
-  if (isPlainObject(value)) {
-    const out: any = {};
-    for (const k in value) {
-      out[k] = compileConst(value[k], ctx, slotMap);
-    }
-    return out;
-  }
-
-  return value;
-}
-
-function assignSlots(steps: StepDef<any>[]): SlotMap {
-  const map = new Map<number, number>();
-
-  const sorted = [...steps].sort((a, b) => a.idx - b.idx);
-
-  sorted.forEach((s, i) => {
-    map.set(s.idx, i);
-  });
-
-  return map;
-}
-
-async function evalExpr(value: any, rt: StepRuntimeCtx): Promise<any> {
-  if (value == null) return value;
-
-  if (typeof value === "function") {
-    return value(rt);
-  }
-
-  if (Array.isArray(value)) {
-    return Promise.all(value.map((v) => evalExpr(v, rt)));
-  }
-
-  if (isPlainObject(value)) {
-    const out: any = {};
-
-    for (const k in value) {
-      out[k] = await evalExpr(value[k], rt);
+      return (rt) => readResult(rt.results, ref)?.[p0];
     }
 
-    return out;
-  }
+    case 2: {
+      const p0 = path[0];
+      const p1 = path[1];
 
-  return value;
-}
-
-export function compileExpr(
-  node: ExprNode,
-  ctx: CompilerCtx,
-  slotMap: SlotMap,
-): CompiledExpr {
-  switch (node.type) {
-    case "const": {
-      const raw = node.value;
-      const compiled = compileConst(raw, ctx, slotMap);
-      return (rt) => evalExpr(compiled, rt);
+      return (rt) => readResult(rt.results, ref)?.[p0]?.[p1];
     }
 
-    case "get": {
-      const slot = slotMap.get(node.ref);
-
-      if (slot === undefined) {
-        throw new Error(`Unknown ref: ${node.ref}`);
-      }
-
-      const path = node.path;
-
+    default:
       return (rt) => {
-        let value = readResult(rt, slot);
+        let value = readResult(rt.results, ref);
 
         for (const p of path) {
           value = value?.[p];
@@ -159,381 +69,168 @@ export function compileExpr(
 
         return value;
       };
-    }
-
-    case "call": {
-      const fn = ctx.services[node.service][node.method];
-      const args = node.args.map((a) => compileExpr(a, ctx, slotMap));
-
-      const serviceMeta = ctx.meta?.[node.service];
-      const methodMeta = serviceMeta?.methods?.[node.method];
-
-      const isAsync =
-        serviceMeta?.async === true ||
-        methodMeta?.async === true ||
-        fn.constructor?.name === "AsyncFunction";
-
-      return async (rt) => {
-        const resolved = await Promise.all(args.map((a) => a(rt)));
-
-        const result = fn(...resolved);
-
-        return isAsync ? await result : result;
-      };
-    }
   }
+}
+
+function compileCall(
+  expr: CallExpr,
+  ctx: CompilerCtx,
+): (rt: StepRuntimeCtx) => Promise<any> {
+  const fn = ctx.services[expr.__service][expr.__method];
+
+  const serviceMeta = ctx.meta?.[expr.__service];
+  const methodMeta = serviceMeta?.methods?.[expr.__method];
+
+  const isAsync =
+    serviceMeta?.async === true ||
+    methodMeta?.async === true ||
+    fn.constructor?.name === "AsyncFunction";
+
+  const compiledArgs = (expr.__args ?? []).map((a) => compileExpr(a, ctx));
+
+  return async (rt) => {
+    const resolved = await Promise.all(
+      compiledArgs.map((a) => evalCompiled(a, rt)),
+    );
+
+    const result = fn(...resolved);
+
+    return isAsync ? await result : result;
+  };
+}
+
+export function compileExpr(expr: Expr, ctx: CompilerCtx): CompiledExpr {
+  // primitives
+  if (
+    expr == null ||
+    typeof expr === "string" ||
+    typeof expr === "number" ||
+    typeof expr === "boolean"
+  ) {
+    return expr;
+  }
+
+  // ref
+  if (isRefExpr(expr)) {
+    return compileRef(expr);
+  }
+
+  // call
+  if (isCallExpr(expr)) {
+    return compileCall(expr, ctx);
+  }
+
+  // array
+  if (Array.isArray(expr)) {
+    return expr.map((v) => compileExpr(v, ctx));
+  }
+
+  // object
+  if (isPlainObject(expr)) {
+    const out: Record<string, CompiledExpr> = {};
+
+    for (const k in expr) {
+      out[k] = compileExpr(expr[k], ctx);
+    }
+
+    return out;
+  }
+
+  throw new Error(`Unknown expr`);
+}
+
+export async function evalCompiled(
+  value: CompiledExpr,
+  rt: StepRuntimeCtx,
+): Promise<any> {
+  // runtime closure
+  if (typeof value === "function") {
+    return value(rt);
+  }
+
+  // array
+  if (Array.isArray(value)) {
+    return Promise.all(value.map((v) => evalCompiled(v, rt)));
+  }
+
+  // object
+  if (isPlainObject(value)) {
+    const out: any = {};
+
+    for (const k in value) {
+      out[k] = await evalCompiled(value[k], rt);
+    }
+
+    return out;
+  }
+
+  // primitive
+  return value;
 }
 
 export function compileStep(
   step: StepDef<any>,
   ctx: CompilerCtx,
-  slot: number,
-  slotMap: SlotMap,
 ): CompiledStep {
-  const resolve = step.resolve ? compileExpr(step.resolve, ctx, slotMap) : null;
-
-  const guards = step.guards ?? [];
-
-  switch (step.spec) {
-    case "__init__":
-      return {
-        id: step.id,
-        idx: step.idx,
-        slot,
-        deps: step.dependsOn,
-        guards,
-
-        run: async (rt) => {
-          const value = resolve ? await resolve(rt) : rt.input;
-
-          const out = await evalExpr(value, rt);
-
-          writeResult(rt, slot, out);
-
-          return out;
-        },
-      };
-
-    case "__out__":
-      return {
-        id: step.id,
-        idx: step.idx,
-        slot,
-        deps: step.dependsOn,
-        guards,
-
-        run: async (rt) => {
-          const value = resolve ? await resolve(rt) : undefined;
-
-          const out = await evalExpr(value, rt);
-          writeResult(rt, slot, out);
-
-          return out;
-        },
-      };
-
-    case "__join__":
-      return {
-        id: step.id,
-        idx: step.idx,
-        slot,
-        deps: step.dependsOn,
-        guards,
-
-        run: async () => undefined,
-      };
-
-    case "__pipe__":
-      return {
-        id: step.id,
-        idx: step.idx,
-        slot,
-        deps: step.dependsOn,
-        guards,
-
-        run: async () => {
-          throw new Error("Pipe must be compiled separately");
-        },
-      };
-
-    default:
-      return {
-        id: step.id,
-        idx: step.idx,
-        slot,
-        deps: step.dependsOn,
-        guards,
-
-        run: async (rt) => {
-          const value = resolve ? await resolve(rt) : undefined;
-
-          const out = await evalExpr(value, rt);
-
-          writeResult(rt, slot, out);
-          return out;
-        },
-      };
-  }
-}
-
-function compilePipeStep(
-  step: StepDef<any>,
-  ctx: CompilerCtx,
-  slot: number,
-  slotMap: SlotMap,
-): CompiledStep {
-  const source = step.resolve ? compileExpr(step.resolve, ctx, slotMap) : null;
-
-  if (!source) {
-    throw new Error("Pipe requires resolve");
-  }
-
-  if (!step.pipe?.steps?.length) {
-    throw new Error("Pipe requires steps");
-  }
-
-  const mode = step.pipe.mode ?? "map";
-
-  // -----------------------------------
-  // compile inner pipe steps
-  // -----------------------------------
-  const pipeSteps = step.pipe.steps.map((s) => {
-    const childSlot = slotMap.get(s.idx)!;
-
-    if (s.spec === "__pipe__") {
-      return compilePipeStep(s, ctx, childSlot, slotMap);
-    }
-
-    return compileStep(s, ctx, childSlot, slotMap);
-  });
-
-  // -----------------------------------
-  // execution levels
-  // -----------------------------------
-
-  const levels = buildLevels(step.pipe.steps).map((level) =>
-    level.map((s) => pipeSteps.find((c) => c.idx === s.idx)!),
-  );
-
-  // -----------------------------------
-  // terminal pipe step
-  // -----------------------------------
-  const terminalIdx =
-    step.pipe.exitMap?.length === 1
-      ? step.pipe.exitMap[0]
-      : step.pipe.exitMap?.[step.pipe.exitMap.length - 1];
-
-  const terminalSlot = slotMap.get(terminalIdx)!;
-
-  // -----------------------------------
-  // iteration executor
-  // -----------------------------------
-  async function runIteration(rt: StepRuntimeCtx, item: any, iter: number) {
-    const childRt: StepRuntimeCtx = {
-      ...rt,
-      input: item,
-
-      pipeStack: [...rt.pipeStack, iter],
-    };
-
-    for (const level of levels) {
-      await Promise.all(level.map((s) => s.run(childRt)));
-    }
-
-    return readResult(childRt, terminalSlot);
-  }
-
-  // -----------------------------------
-  // compiled pipe runtime
-  // -----------------------------------
-
   return {
     id: step.id,
     idx: step.idx,
-    slot,
     deps: step.dependsOn,
     guards: step.guards ?? [],
-
-    run: async (rt) => {
-      const items = await evalExpr(source(rt), rt);
-
-      const list = Array.isArray(items) ? items : [];
-
-      switch (mode) {
-        // -----------------------------------
-        // MAP
-        // -----------------------------------
-
-        case "map": {
-          const res = [];
-
-          for (let i = 0; i < list.length; i++) {
-            const out = await runIteration(rt, list[i], i);
-
-            res[i] = out;
-          }
-
-          writeResult(rt, slot, res);
-
-          return res;
+    spec: step.spec,
+    resolve: step.resolve ? compileExpr(step.resolve, ctx) : null,
+    pipe: step.pipe
+      ? {
+          mode: step.pipe.mode,
+          plan: (step.pipe as any).plan, // <- already recursively compiled
         }
-
-        case "filter": {
-          const res = [];
-
-          for (let i = 0; i < list.length; i++) {
-            const out = await runIteration(rt, list[i], i);
-
-            if (out) {
-              res.push(list[i]);
-            }
-          }
-
-          writeResult(rt, slot, res);
-
-          return res;
-        }
-
-        // -----------------------------------
-        // FIND
-        // -----------------------------------
-
-        case "find": {
-          for (let i = 0; i < list.length; i++) {
-            const out = await runIteration(rt, list[i], i);
-
-            if (out) {
-              writeResult(rt, slot, list[i]);
-
-              return list[i];
-            }
-          }
-
-          writeResult(rt, slot, undefined);
-
-          return undefined;
-        }
-
-        // -----------------------------------
-        // SOME
-        // -----------------------------------
-
-        case "some": {
-          for (let i = 0; i < list.length; i++) {
-            const out = await runIteration(rt, list[i], i);
-
-            if (out) {
-              writeResult(rt, slot, true);
-
-              return true;
-            }
-          }
-
-          writeResult(rt, slot, false);
-
-          return false;
-        }
-
-        // -----------------------------------
-        // EVERY
-        // -----------------------------------
-
-        case "every": {
-          for (let i = 0; i < list.length; i++) {
-            const out = await runIteration(rt, list[i], i);
-
-            if (!out) {
-              writeResult(rt, slot, false);
-
-              return false;
-            }
-          }
-
-          writeResult(rt, slot, true);
-
-          return true;
-        }
-
-        // -----------------------------------
-        // COUNT
-        // -----------------------------------
-
-        case "count": {
-          let count = 0;
-
-          for (let i = 0; i < list.length; i++) {
-            const out = await runIteration(rt, list[i], i);
-
-            if (out) {
-              count++;
-            }
-          }
-
-          writeResult(rt, slot, count);
-
-          return count;
-        }
-
-        default:
-          throw new Error(`Unknown pipe mode ${mode}`);
-      }
-    },
+      : undefined,
   };
-}
-
-function collectAllSteps(workflow: WorkflowDef<any, any, any, any>) {
-  const all: StepDef<any>[] = [];
-
-  function visit(step: StepDef<any>) {
-    all.push(step);
-
-    if (step.spec === "__pipe__" && step.pipe) {
-      for (const s of step.pipe.steps ?? []) {
-        visit(s);
-      }
-    }
-  }
-
-  for (const step of workflow.steps) {
-    visit(step);
-  }
-
-  return all;
 }
 
 export function compileWorkflow(
   workflow: WorkflowDef<any, any, any, any>,
   ctx: CompilerCtx,
 ): ExecutionPlan {
-  const flatSteps = collectAllSteps(workflow);
+  let outputIndex: number | undefined;
 
-  const slotMap = assignSlots(flatSteps);
+  let exitIndexes: number[] | undefined;
 
-  const compiledLevels = buildLevels(workflow.steps).map((level) =>
-    level.map((step) => {
-      const slot = slotMap.get(step.idx)!;
+  if (workflow.outputIdx !== undefined) {
+    outputIndex = workflow.outputIdx;
+  } else if (workflow.endSteps?.length) {
+    exitIndexes = workflow.endSteps.map((s) => s.idx);
+  }
 
-      if (step.spec === "__pipe__") {
-        return compilePipeStep(step, ctx, slot, slotMap);
-      }
+  const compiledSteps = workflow.steps.map((step: any) => {
+    if (step.pipe?.workflow) {
+      return {
+        ...step,
 
-      return compileStep(step, ctx, slot, slotMap);
-    }),
+        pipe: {
+          ...step.pipe,
+
+          plan: compileWorkflow(step.pipe.workflow, ctx),
+        },
+      };
+    }
+
+    return step;
+  });
+
+  const levels = buildLevels(compiledSteps);
+
+  const compiledLevels = levels.map((level) =>
+    level.map((step) => compileStep(step, ctx)),
   );
+
+  const maxIndex = Math.max(...workflow.steps.map((s: any) => s.idx));
 
   return {
     levels: compiledLevels,
-
-    outputSlot:
-      workflow.outputIdx !== undefined
-        ? slotMap.get(workflow.outputIdx)
-        : undefined,
-
-    exitSlots: workflow.endSteps?.map((s) => slotMap.get(s.idx)!),
-
-    maxSlot: slotMap.size,
-
-    slotMap,
+    outputIndex,
+    exitIndexes: exitIndexes ?? [],
+    maxIndex,
   };
 }
 

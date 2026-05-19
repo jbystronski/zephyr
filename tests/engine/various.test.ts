@@ -162,7 +162,7 @@ describe("Various tests", () => {
         ],
         keyToFind: "emails",
       },
-      [useLog()],
+      [],
     );
 
     expect(testTwo.output.found).toEqual({

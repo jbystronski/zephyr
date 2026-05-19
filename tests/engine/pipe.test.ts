@@ -198,7 +198,7 @@ describe("Pipe", () => {
         elements: ["cat", "dog", "bird"],
         another: "fish",
       },
-      [useLog()],
+      [],
     );
 
     expect(res.output).toEqual(["<CAT>!", "<DOG>!", "<BIRD>!", "<FISH>!"]);

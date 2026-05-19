@@ -1,11 +1,12 @@
+import { createExprCtx, remapWorkflowInstance, toExpr } from "./ast.js";
 import {
-  createExprCtx,
+  Expr,
   ExprCtx,
-  ExprNode,
-  remapWorkflowInstance,
-  toNode,
-} from "./ast.js";
-import { ServiceRegistry, Simplify } from "./types.js";
+  PipeMode,
+  ServiceRegistry,
+  Simplify,
+  StepSpec,
+} from "./types.js";
 import { generateWorkflowId } from "./utils.js";
 
 type WorkflowInput<T> =
@@ -23,36 +24,29 @@ type WorkflowOutput<T> =
 
 export type PipeNode = {
   type: "pipe";
-  input: ExprNode;
+  // input: ExprNode;
+  input: Expr;
   mode: PipeMode;
-  steps: StepDef<any>[];
 
-  // workflow: {
-  //   _id: string;
-  //   name: string;
-  //
-  //   steps: StepDef<any>[];
-  //
-  //   //TODO: add guards here?
-  //   // guards: number[]
-  //   entrySteps: StepDef<any>[];
-  //   endSteps: StepDef<any>[];
-  //
-  //   aliasMap: {
-  //     results: Record<string, string>;
-  //   };
-  // };
+  workflow: {
+    _id: string;
+    name: string;
+
+    steps: StepDef<any>[];
+
+    //TODO: add guards here?
+    // guards: number[]
+    entrySteps: StepDef<any>[];
+    endSteps: StepDef<any>[];
+
+    aliasMap: {
+      results: Record<string, string>;
+    };
+  };
 
   entryMap: Record<string, string>;
   exitMap: number[];
 };
-
-export type StepSpec =
-  | "__init__"
-  | "__eval__"
-  | "__out__"
-  | "__pipe__"
-  | "__join__";
 
 export type WFConfig<Input, Services, WFReg> = {
   input: Input;
@@ -65,8 +59,8 @@ export type StepDef<ID extends string = string> = {
   idx: number;
   dependsOn: number[];
   guards?: number[];
-  resolve: ExprNode | null;
-
+  // resolve: ExprNode | null;
+  resolve: Expr;
   options?: StepOptions<any>;
   spec?: StepSpec;
   pipe?: PipeNode;
@@ -134,8 +128,6 @@ type MergeBranchSteps<
       ]
     >
   : Acc;
-
-type PipeMode = "map" | "filter" | "find" | "some" | "every" | "count";
 
 type PipeResult<Mode extends PipeMode, Item> = Mode extends "map"
   ? Item[]
@@ -226,8 +218,9 @@ export class WorkflowBuilder<
 
     this.idToIdx[id] = this.idx;
 
-    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : [];
-    const ast = toNode(expr);
+    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : null;
+
+    const ast = expr != null ? toExpr(expr) : null;
 
     this.steps.push({
       id,
@@ -310,7 +303,7 @@ export class WorkflowBuilder<
 
     const pipeExpr = input ? input(createExprCtx(this.idToIdx)) : [];
 
-    const pipeInputAst = toNode(pipeExpr);
+    const pipeInputAst = pipeExpr != null ? toExpr(pipeExpr) : null;
 
     const subWf: WorkflowDef<any, any, any, any> = {
       _id: wfId,
@@ -346,7 +339,8 @@ export class WorkflowBuilder<
         mode,
 
         input: pipeInputAst,
-        steps: subWf.steps,
+        workflow: subWf,
+
         entryMap: Object.fromEntries(entrySteps.map((s) => [s.id, s.idx])),
         exitMap: endSteps.map((s) => s.idx),
       },
@@ -460,8 +454,10 @@ export class WorkflowBuilder<
     if (!subWf) {
       throw new Error(`Subflow not found: ${workflowKey}`);
     }
-    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : [];
-    const ast = toNode(expr);
+
+    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : null;
+
+    const ast = expr != null ? toExpr(expr) : null;
 
     const { wf, maxIdx, outputIdx } = remapWorkflowInstance(
       subWf,
@@ -554,16 +550,20 @@ export class WorkflowBuilder<
   output<R>(
     resolve: (ctx: ExprCtx<Config["services"], Results>) => R,
   ): WorkflowDef<Config["input"], Results, Steps, R> {
-    this.idToIdx["__output__"] = this.idx;
-    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : [];
-    const ast = toNode(expr);
+    const id = `${this.name}_out`;
+    this.idToIdx[id] = this.idx;
+    // const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : [];
+    // const ast = toNode(expr);
+
+    const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : null;
+
+    const ast = expr != null ? toExpr(expr) : null;
 
     this.outputIdx = this.idx;
 
     this.steps.push({
-      id: "__output__",
+      id,
       idx: this.idx,
-      spec: "__out__",
       dependsOn: [...this.frontier],
 
       // guards: [...(this.guards ?? [])],

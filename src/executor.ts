@@ -1,40 +1,30 @@
+import { evalCompiled, readResult } from "./ast-compiler.js";
+import { composeObserver } from "./observer.js";
 import {
   CompiledStep,
-  readResult,
+  ExecutionFrame,
+  ExecutionPlan,
+  PipeMode,
   ResultsArray,
   StepRuntimeCtx,
-  writeResult,
-} from "./ast-compiler.js";
-import { composeObserver } from "./observer.js";
-import { ExecutionFrame, WorkflowObserver } from "./types.js";
+  WorkflowObserver,
+} from "./types.js";
 
-export type ExecutionPlan = {
-  levels: CompiledStep[][];
-  outputSlot?: number;
-  exitSlots?: number[];
-
-  maxSlot: number;
-
-  slotMap: Map<number, number>;
-};
-
-function checkGuards(
-  guards: number[] | undefined,
-  rt: StepRuntimeCtx,
-  slotMap: Map<number, number>,
-) {
+function checkGuards(guards: number[] | undefined, rt: StepRuntimeCtx) {
   if (!guards?.length) {
     return true;
   }
 
   for (const ref of guards) {
-    const slot = slotMap.get(ref);
+    const res = readResult(rt.results, ref);
 
-    if (slot === undefined) {
+    // const res = rt.results[ref];
+
+    if (res === undefined) {
       throw new Error(`Unknown guard ref: ${ref}`);
     }
 
-    if (readResult(rt, slot) !== true) {
+    if (res !== true) {
       return false;
     }
   }
@@ -93,13 +83,10 @@ async function runWithRetry<T>(
 export async function executePlan(
   plan: ExecutionPlan,
   input: any,
+  results: ResultsArray,
   observers: WorkflowObserver[],
 ) {
-  // const results: ResultsArray = new Array(plan.maxSlot);
-
   const hasObservers = observers.length > 0;
-
-  const results: ResultsArray = new Map<number, any>();
 
   const runWithObservers = hasObservers ? composeObserver(observers) : null;
 
@@ -108,20 +95,140 @@ export async function executePlan(
   };
 
   // -----------------------------------
-  // ROOT RUNTIME CONTEXT
+  // ROOT CONTEXT
   // -----------------------------------
 
   const rootRt: StepRuntimeCtx = {
     input,
     results,
-
-    pipeStack: [],
     observers,
     frame: undefined,
   };
 
   // -----------------------------------
-  // EXECUTION
+  // STEP SEMANTICS (THE IMPORTANT PART)
+  // -----------------------------------
+  function createPipeResults(parent: ResultsArray, size: number): ResultsArray {
+    const local = new Array(size) as ResultsArray;
+    local.__parent = parent;
+    return local;
+  }
+  function runPipeItem(
+    step: CompiledStep,
+    rt: StepRuntimeCtx,
+    item: any,
+    i: number,
+  ) {
+    const localResults = createPipeResults(
+      results,
+      step.pipe!.plan.maxIndex + 1,
+    );
+
+    // return executePlan(step.pipe?.plan!, item, [...rt.results], rt.observers);
+    return executePlan(step.pipe?.plan!, item, localResults, rt.observers);
+  }
+
+  async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
+    switch (step.spec) {
+      case "__init__": {
+        if (!step.resolve) {
+          return rt.input;
+        }
+
+        return evalCompiled(step.resolve, rt);
+      }
+
+      case "__join__": {
+        return undefined;
+      }
+
+      case "__pipe__": {
+        const items = step.resolve ? await step.resolve(rt) : [];
+        const list = Array.isArray(items) ? items : [];
+
+        let mode: PipeMode = step.pipe?.mode ?? "map";
+
+        switch (mode) {
+          case "map":
+            const res = await Promise.all(
+              list.map((item, i) => runPipeItem(step, rt, item, i)),
+            );
+
+            return res;
+
+          case "filter": {
+            const res = [];
+
+            for (let i = 0; i < list.length; i++) {
+              const out = await runPipeItem(step, rt, list[i], i);
+
+              if (out) {
+                res.push(list[i]);
+              }
+            }
+
+            return res;
+          }
+          case "find": {
+            for (let i = 0; i < list.length; i++) {
+              const out = await runPipeItem(step, rt, list[i], i);
+
+              if (out) {
+                return list[i];
+              }
+            }
+
+            return undefined;
+          }
+
+          case "some": {
+            for (let i = 0; i < list.length; i++) {
+              const out = await runPipeItem(step, rt, list[i], i);
+
+              if (out) {
+                return true;
+              }
+            }
+
+            return false;
+          }
+
+          case "every": {
+            for (let i = 0; i < list.length; i++) {
+              const out = await runPipeItem(step, rt, list[i], i);
+
+              if (!out) {
+                return false;
+              }
+            }
+
+            return true;
+          }
+
+          case "count": {
+            let count = 0;
+
+            for (let i = 0; i < list.length; i++) {
+              const out = await runPipeItem(step, rt, list[i], i);
+
+              if (out) count++;
+            }
+
+            return count;
+          }
+        }
+      }
+
+      default: {
+        const out = await evalCompiled(step.resolve, rt);
+
+        return out;
+      }
+    }
+  }
+
+  // -----------------------------------
+  // EXECUTION LOOP
   // -----------------------------------
 
   for (const level of plan.levels) {
@@ -135,10 +242,6 @@ export async function executePlan(
             }
           : undefined;
 
-        // -----------------------------------
-        // STEP RUNTIME
-        // -----------------------------------
-
         const rt: StepRuntimeCtx = {
           ...rootRt,
           frame,
@@ -148,9 +251,8 @@ export async function executePlan(
         // GUARDS
         // -----------------------------------
 
-        if (!checkGuards(step.guards, rt, plan.slotMap)) {
-          writeResult(rt, step.slot, undefined);
-
+        if (!checkGuards(step.guards, rt)) {
+          results[step.idx] = undefined;
           return;
         }
 
@@ -159,15 +261,14 @@ export async function executePlan(
         }
 
         // -----------------------------------
-        // EXECUTION
+        // EXECUTION WRAPPER
         // -----------------------------------
 
         const execute = async () => {
-          if (frame) {
-            frame.attempts++;
-          }
+          if (frame) frame.attempts++;
 
-          const value = await step.run(rt);
+          const value = await executeStep(step, rt);
+          results[step.idx] = value;
 
           if (frame) {
             frame.value = value;
@@ -195,7 +296,6 @@ export async function executePlan(
             frame.error = err;
             frame.end = Date.now();
           }
-
           throw err;
         }
       }),
@@ -203,22 +303,18 @@ export async function executePlan(
   }
 
   // -----------------------------------
-  // OUTPUT EXTRACTION
+  // OUTPUT
   // -----------------------------------
 
   let output: any;
 
-  if (plan.outputSlot !== undefined) {
-    output = readResult(rootRt, plan.outputSlot);
-  } else if (plan.exitSlots?.length === 1) {
-    output = readResult(rootRt, plan.exitSlots[0]);
-  } else if (plan.exitSlots?.length) {
-    output = plan.exitSlots.map((slot) => readResult(rootRt, slot));
-  } else {
-    output = undefined;
+  if (plan.outputIndex !== undefined) {
+    output = results[plan.outputIndex];
+  } else if (plan.exitIndexes?.length === 1) {
+    output = results[plan.exitIndexes[0]];
+  } else if (plan.exitIndexes?.length) {
+    output = plan.exitIndexes.map((i) => results[i]);
   }
-
-  console.log("result", rootRt.results);
 
   return output;
 }

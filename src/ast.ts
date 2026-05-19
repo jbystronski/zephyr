@@ -1,41 +1,106 @@
-import { ServiceRegistry } from "./types.js";
+import { CallExpr, Expr, Primitive, RefExpr } from "./types.js";
 
-export type ExprNode =
-  | {
-      type: "const";
-      value: any;
-    }
-  | {
-      type: "get";
-      ref: number;
-      path: (string | symbol)[];
-    }
-  | {
-      type: "call";
-      service: string;
-      method: string;
-      args: ExprNode[];
-    };
+export function isPrimitive(v: any): v is Primitive {
+  return (
+    v === null ||
+    typeof v === "string" ||
+    typeof v === "number" ||
+    typeof v === "boolean"
+  );
+}
 
-export type ExprServiceCtx<S extends ServiceRegistry> = {
-  [SK in keyof S]: {
-    [MK in keyof S[SK]]: (
-      ...args: Parameters<S[SK][MK]>
-    ) => ExprValue<Awaited<ReturnType<S[SK][MK]>>>;
+export function isPlainObject(value: any): boolean {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+
+  const proto = Object.getPrototypeOf(value);
+
+  return proto === Object.prototype || proto === null;
+}
+
+export function isRefExpr(v: any): v is RefExpr {
+  return v && typeof v === "object" && typeof v.__ref === "number";
+}
+
+export function isCallExpr(v: any): v is CallExpr {
+  return (
+    v &&
+    typeof v === "object" &&
+    typeof v.__service === "string" &&
+    typeof v.__method === "string"
+  );
+}
+
+export function isExpr(v: any): v is Expr {
+  return (
+    isPrimitive(v) ||
+    Array.isArray(v) ||
+    isPlainObject(v) ||
+    isRefExpr(v) ||
+    isCallExpr(v)
+  );
+}
+
+export function toExpr(v: any): Expr {
+  // unwrap proxy values
+  if (v && typeof v === "object" && "__expr" in v) {
+    return v.__expr;
+  }
+
+  // primitives
+  if (isPrimitive(v)) {
+    return v;
+  }
+
+  // arrays
+  if (Array.isArray(v)) {
+    return v.map(toExpr);
+  }
+
+  // objects
+  if (isPlainObject(v)) {
+    const out: Record<string, Expr> = {};
+
+    for (const k in v) {
+      out[k] = toExpr(v[k]);
+    }
+
+    return out;
+  }
+
+  throw new Error(`Unsupported expr value: ${v}`);
+}
+
+export function createGetter(ref: number): any {
+  const handler: ProxyHandler<any> = {
+    get(target, prop) {
+      if (prop === "__expr") {
+        return target.__expr;
+      }
+
+      return new Proxy(
+        {
+          __expr: {
+            __ref: ref,
+            __path: [...(target.__expr.__path ?? []), prop],
+          },
+        },
+        handler,
+      );
+    },
   };
-};
 
-export type ExprCtx<S extends ServiceRegistry, Results> = ExprServiceCtx<S> & {
-  get<K extends keyof Results>(key: K): Results[K];
-};
-
-export type ExprValue<T> = T & {
-  __node: ExprNode;
-};
-
-export type GetterProxy<T> = T & {
-  __node: ExprNode;
-};
+  return new Proxy(
+    {
+      __expr: {
+        __ref: ref,
+        __path: [],
+      },
+    },
+    handler,
+  );
+}
 
 export function createExprCtx(idToIdx: Record<string, number>): any {
   const root: any = {};
@@ -61,11 +126,10 @@ export function createExprCtx(idToIdx: Record<string, number>): any {
         {
           get(_, method) {
             return (...args: any[]) => ({
-              __node: {
-                type: "call",
-                service,
-                method,
-                args: args.map(toNode),
+              __expr: {
+                __service: service,
+                __method: method,
+                __args: args.map(toExpr),
               },
             });
           },
@@ -73,59 +137,6 @@ export function createExprCtx(idToIdx: Record<string, number>): any {
       );
     },
   });
-}
-
-export function toNode(v: any): ExprNode {
-  if (v && typeof v === "object" && "__node" in v) {
-    return v.__node;
-  }
-
-  if (Array.isArray(v)) {
-    return {
-      type: "const",
-      value: v.map(toNode),
-    };
-  }
-
-  if (v && typeof v === "object") {
-    return {
-      type: "const",
-      value: Object.fromEntries(
-        Object.entries(v).map(([k, val]) => [k, toNode(val)]),
-      ),
-    };
-  }
-
-  return {
-    type: "const",
-    value: v,
-  };
-}
-
-export function createGetter(ref: number): any {
-  const handler: ProxyHandler<any> = {
-    get(target, prop) {
-      if (prop === "__node") return target.__node;
-
-      return new Proxy(
-        {
-          __node: {
-            type: "get",
-            ref,
-            path: [...target.__node.path, prop],
-          },
-        },
-        handler,
-      );
-    },
-  };
-
-  return new Proxy(
-    {
-      __node: { type: "get", ref, path: [] },
-    },
-    handler,
-  );
 }
 
 export function remapWorkflowInstance(
@@ -143,8 +154,12 @@ export function remapWorkflowInstance(
   const initStep = wf.steps.find((s: any) => s.idx === initIdx);
 
   if (initStep) {
-    initStep.resolve = inputAst;
     initStep.dependsOn = parentFrontier.length ? [...parentFrontier] : [];
+
+    if (initStep.spec === "__init__") {
+      delete initStep.spec;
+      initStep.resolve = inputAst;
+    }
   }
 
   const outputIdx =
@@ -180,7 +195,7 @@ export function offsetWorkflow(obj: any, offset: number) {
         continue;
       }
 
-      if (key === "ref" && typeof value === "number") {
+      if (key === "__ref" && typeof value === "number") {
         out[key] = value + offset;
         continue;
       }
