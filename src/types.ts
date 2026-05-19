@@ -164,7 +164,8 @@ export type CompiledStep = {
   deps: number[];
   guards: number[];
   spec?: StepSpec;
-  resolve: CompiledExpr | null;
+  // resolve: CompiledExpr | null;
+  resolve: StepExecutor | null;
   pipe?: {
     mode: PipeMode;
     plan: ExecutionPlan;
@@ -185,3 +186,5 @@ export type CompiledExpr =
   | CompiledExpr[]
   | Record<string, any>
   | ((rt: StepRuntimeCtx) => any | Promise<any>);
+
+export type StepExecutor = (rt: StepRuntimeCtx) => any;

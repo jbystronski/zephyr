@@ -1,4 +1,4 @@
-import { evalCompiled, readResult } from "./ast-compiler.js";
+import { readResult } from "./ast-compiler.js";
 import { composeObserver } from "./observer.js";
 import {
   CompiledStep,
@@ -135,7 +135,7 @@ export async function executePlan(
           return rt.input;
         }
 
-        return evalCompiled(step.resolve, rt);
+        return step.resolve ? await step.resolve(rt) : undefined;
       }
 
       case "__join__": {
@@ -220,9 +220,10 @@ export async function executePlan(
       }
 
       default: {
-        const out = await evalCompiled(step.resolve, rt);
+        return step.resolve ? await step.resolve(rt) : undefined;
+        // const out = await evalCompiled(step.resolve, rt);
 
-        return out;
+        // return out;
       }
     }
   }
