@@ -32,6 +32,24 @@ export type WorkflowDef<
   };
 };
 
+export type WFConfig<Input, Services, WFReg> = {
+  input: Input;
+  services: Services;
+  wfReg: WFReg;
+};
+
+export type PipeResult<Mode extends PipeMode, Item> = Mode extends "map"
+  ? Item[]
+  : Mode extends "filter"
+    ? Item[]
+    : Mode extends "find"
+      ? Item | undefined
+      : Mode extends "some" | "every"
+        ? boolean
+        : Mode extends "count"
+          ? number
+          : never;
+
 export type PipeNode = {
   type: "pipe";
   // input: ExprNode;

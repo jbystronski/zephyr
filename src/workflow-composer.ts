@@ -1,13 +1,13 @@
 import { createExprCtx, remapWorkflowInstance, toExpr } from "./ast.js";
 import type {
-  Expr,
   ExprCtx,
   PipeMode,
+  PipeResult,
   ServiceRegistry,
   Simplify,
   StepDef,
   StepOptions,
-  StepSpec,
+  WFConfig,
   WorkflowDef,
   WorkflowInput,
   WorkflowOutput,
@@ -16,12 +16,6 @@ import { generateWorkflowId } from "./utils.js";
 
 // type WorkflowOutput<T> =
 //   T extends WorkflowDef<any, any, any, any, infer O> ? O : never;
-
-export type WFConfig<Input, Services, WFReg> = {
-  input: Input;
-  services: Services;
-  wfReg: WFReg;
-};
 
 type MergeBranchResults<
   Branches extends readonly any[],
@@ -45,18 +39,6 @@ type MergeBranchSteps<
       ]
     >
   : Acc;
-
-type PipeResult<Mode extends PipeMode, Item> = Mode extends "map"
-  ? Item[]
-  : Mode extends "filter"
-    ? Item[]
-    : Mode extends "find"
-      ? Item | undefined
-      : Mode extends "some" | "every"
-        ? boolean
-        : Mode extends "count"
-          ? number
-          : never;
 
 type NewType<Results> = StepOptions<Results>;
 

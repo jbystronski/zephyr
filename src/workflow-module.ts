@@ -203,7 +203,7 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
   meta,
 }: {
   module: M;
-  services: RuntimeServices<M>;
+  services: ModuleRuntimeServices<M>;
   meta?: ServiceMetaRegistry<any>;
 }) {
   const compiled = compileModule(module, services, meta);
@@ -239,14 +239,14 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
   };
 }
 
-type ModuleServices<M> = M extends Module<infer S, any, any, any> ? S : never;
+export type ModuleServices<M> =
+  M extends Module<infer S, any, any, any> ? S : never;
 
-type ModuleDeps<M> = M extends Module<any, any, infer D, any> ? D : never;
+export type ModuleDeps<M> =
+  M extends Module<any, any, infer D, any> ? D : never;
 
-type RuntimeServices<M extends Module<any, any, any, any>> = FinalServices<
-  ModuleServices<M>,
-  ModuleDeps<M>
->;
+export type ModuleRuntimeServices<M extends Module<any, any, any, any>> =
+  FinalServices<ModuleServices<M>, ModuleDeps<M>>;
 
 export function createModuleFactory<S extends ServiceRegistry>() {
   return function <
