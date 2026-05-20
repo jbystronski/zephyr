@@ -12,16 +12,21 @@ import {
 
 export function createExecutor(
   plan: ExecutionPlan,
+  services: Record<string, any>,
   observers: WorkflowObserver[],
 ) {
-  if (observers.length === 0) return createFastExecutor(plan);
-  return createObservedExecutor(plan, observers);
+  if (observers.length === 0) return createFastExecutor(plan, services);
+  return createObservedExecutor(plan, services, observers);
 }
 
-function createFastExecutor(plan: ExecutionPlan) {
+function createFastExecutor(
+  plan: ExecutionPlan,
+  services: Record<string, any>,
+) {
   return async function executePlanFast(input: any, results: ResultsArray) {
     const rootRt = {
       input,
+      services,
       results,
       observers: [],
       frame: undefined,
@@ -51,6 +56,7 @@ function createFastExecutor(plan: ExecutionPlan) {
 
 function createObservedExecutor(
   plan: ExecutionPlan,
+  services: Record<string, any>,
   observers: WorkflowObserver[],
 ) {
   const observerFn = composeObserver(observers);
@@ -62,6 +68,7 @@ function createObservedExecutor(
   ) {
     const rootRt = {
       input,
+      services,
       results,
       observers,
       frame: undefined,
@@ -125,18 +132,21 @@ function createObservedExecutor(
 async function runPipeWorkflow(
   plan: ExecutionPlan,
   input: any,
-  parentResults: ResultsArray,
-  observers: WorkflowObserver[],
+  rt: StepRuntimeCtx,
+  // services: Record<string, any>,
+  // parentResults: ResultsArray,
+  // observers: WorkflowObserver[],
 ) {
   const results = new Array(plan.maxIndex + 1) as ResultsArray;
 
   // IMPORTANT: preserve parent chain semantics
-  results.__parent = parentResults;
-
+  // results.__parent = parentResults;
+  results.__parent = rt.results;
   const rtBase: StepRuntimeCtx = {
     input,
+    services: rt.services,
     results,
-    observers,
+    observers: rt.observers,
     frame: undefined,
   };
 
@@ -180,9 +190,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
       switch (mode) {
         case "map":
           const res = await Promise.all(
-            list.map((item, i) =>
-              runPipeWorkflow(step.pipe?.plan!, item, rt.results, rt.observers),
-            ),
+            list.map((item, i) => runPipeWorkflow(step.pipe?.plan!, item, rt)),
           );
 
           return res;
@@ -191,12 +199,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
           const res = [];
 
           for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(
-              step.pipe?.plan!,
-              list[i],
-              rt.results,
-              rt.observers,
-            );
+            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
 
             if (out) {
               res.push(list[i]);
@@ -207,12 +210,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
         }
         case "find": {
           for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(
-              step.pipe?.plan!,
-              list[i],
-              rt.results,
-              rt.observers,
-            );
+            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
 
             if (out) {
               return list[i];
@@ -224,12 +222,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
 
         case "some": {
           for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(
-              step.pipe?.plan!,
-              list[i],
-              rt.results,
-              rt.observers,
-            );
+            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
 
             if (out) {
               return true;
@@ -241,12 +234,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
 
         case "every": {
           for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(
-              step.pipe?.plan!,
-              list[i],
-              rt.results,
-              rt.observers,
-            );
+            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
 
             if (!out) {
               return false;
@@ -260,12 +248,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
           let count = 0;
 
           for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(
-              step.pipe?.plan!,
-              list[i],
-              rt.results,
-              rt.observers,
-            );
+            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
 
             if (out) count++;
           }

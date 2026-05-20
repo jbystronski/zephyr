@@ -223,7 +223,7 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
         throw new Error(`Workflow not found: ${String(workflowId)}`);
       }
 
-      const executor = createExecutor(plan, observers);
+      const executor = createExecutor(plan, services, observers);
 
       const results = new Array(plan.maxIndex + 1);
 

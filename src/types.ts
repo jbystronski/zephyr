@@ -256,7 +256,6 @@ export type ExecutionFrame = {
 };
 
 export type CompilerCtx<S = any, M = any> = {
-  services: S;
   meta: M;
 };
 
@@ -285,6 +284,7 @@ export type CompiledStep = {
 
 export type StepRuntimeCtx = {
   input: any;
+  services: Record<string, any>;
   results: ResultsArray;
   observers: any[];
   frame?: ExecutionFrame;

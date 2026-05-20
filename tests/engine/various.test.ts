@@ -6,9 +6,9 @@ import {
 import { registryA } from "../utils";
 import { baseServices, eventStream, StandardServices, useLog } from "../../src";
 
-// eventStream.subscribe((ev: any) => {
-//   console.dir(ev, { depth: 12 });
-// });
+eventStream.subscribe((ev: any) => {
+  console.dir(ev, { depth: 12 });
+});
 
 type ExplorerObject = {
   label: string;
@@ -119,6 +119,8 @@ const modC = mod({
       .output(({ get }) => ({ found: get("find").found })),
   }),
 });
+
+console.dir(modC.__public.accessChained, { depth: 16 });
 
 const services = baseServices.build();
 

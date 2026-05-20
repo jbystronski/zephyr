@@ -376,7 +376,7 @@ const r = await r0.run(
   [],
 );
 
-// console.dir(r, { depth: 16 });
+console.dir(r, { depth: 16 });
 //
 const r2 = await r0.run(
   "filterSome",
@@ -387,6 +387,6 @@ const r2 = await r0.run(
   [],
 );
 
-// console.log(r2);
+console.log(r2);
 
 // console.dir(testPipe.__public.filterSome, { depth: 16 });
