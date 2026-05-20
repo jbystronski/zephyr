@@ -72,7 +72,6 @@ describe("Subflow", () => {
         ...registryA,
         stripe: {
           async charge(amount: number) {
-            console.log("charged ", amount);
             return amount;
           },
         },

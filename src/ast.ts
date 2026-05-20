@@ -72,35 +72,103 @@ export function toExpr(v: any): Expr {
   throw new Error(`Unsupported expr value: ${v}`);
 }
 
-export function createGetter(ref: number): any {
+export function createExprProxy(expr: any): any {
   const handler: ProxyHandler<any> = {
     get(target, prop) {
       if (prop === "__expr") {
         return target.__expr;
       }
 
-      return new Proxy(
-        {
-          __expr: {
-            __ref: ref,
-            __path: [...(target.__expr.__path ?? []), prop],
-          },
-        },
-        handler,
-      );
+      return createExprProxy({
+        ...target.__expr,
+
+        __path: [...(target.__expr.__path ?? []), prop],
+      });
     },
   };
 
   return new Proxy(
     {
-      __expr: {
-        __ref: ref,
-        __path: [],
-      },
+      __expr: expr,
     },
     handler,
   );
 }
+
+// export function createGetter(ref: number): any {
+//   const handler: ProxyHandler<any> = {
+//     get(target, prop) {
+//       if (prop === "__expr") {
+//         return target.__expr;
+//       }
+//
+//       return new Proxy(
+//         {
+//           __expr: {
+//             __ref: ref,
+//             __path: [...(target.__expr.__path ?? []), prop],
+//           },
+//         },
+//         handler,
+//       );
+//     },
+//   };
+//
+//   return new Proxy(
+//     {
+//       __expr: {
+//         __ref: ref,
+//         __path: [],
+//       },
+//     },
+//     handler,
+//   );
+// }
+
+export function createGetter(ref: number): any {
+  return createExprProxy({
+    __ref: ref,
+    __path: [],
+  });
+}
+
+// export function createExprCtx(idToIdx: Record<string, number>): any {
+//   const root: any = {};
+//
+//   root.get = (key: string) => {
+//     const idx = idToIdx[key];
+//
+//     if (idx === undefined) {
+//       throw new Error(`Unknown ref "${key}"`);
+//     }
+//
+//     return createGetter(idx);
+//   };
+//
+//   return new Proxy(root, {
+//     get(_, service) {
+//       if (service === "get") {
+//         return root.get;
+//       }
+//
+//       return new Proxy(
+//         {},
+//         {
+//           get(_, method) {
+//             return (...args: any[]) => ({
+//               __expr: {
+//                 __service: service,
+//                 __method: method,
+//                 __args: args.map(toExpr),
+//               },
+//             });
+//           },
+//         },
+//       );
+//     },
+//   });
+// }
+//
 
 export function createExprCtx(idToIdx: Record<string, number>): any {
   const root: any = {};
@@ -125,13 +193,13 @@ export function createExprCtx(idToIdx: Record<string, number>): any {
         {},
         {
           get(_, method) {
-            return (...args: any[]) => ({
-              __expr: {
+            return (...args: any[]) =>
+              createExprProxy({
                 __service: service,
                 __method: method,
                 __args: args.map(toExpr),
-              },
-            });
+                __path: [],
+              });
           },
         },
       );
@@ -141,7 +209,7 @@ export function createExprCtx(idToIdx: Record<string, number>): any {
 
 export function remapWorkflowInstance(
   subWf: any,
-  prefix: string,
+
   inputAst: any,
   parentFrontier: number[],
   offset: number,

@@ -208,15 +208,18 @@ export type Expr =
   | RefExpr
   | CallExpr;
 
+type PropertyKey = string | number | symbol;
+
 export type RefExpr = {
   __ref: number;
-  __path?: (string | number | symbol)[];
+  __path?: PropertyKey[];
 };
 
 export type CallExpr = {
   __service: string;
   __method: string;
   __args?: Expr[];
+  __path?: PropertyKey[];
 };
 
 export type ExprValue<T> = T & {

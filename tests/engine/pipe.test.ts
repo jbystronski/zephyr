@@ -175,9 +175,6 @@ const testPipe = createMod({
 const s = baseServices
   .add("s1", {
     addAnimal: (input: { initArray: string[]; newAnimal: string }) => {
-      console.log("new animal", input.newAnimal);
-      console.log("what is initArray in add animal");
-      console.log(input.initArray);
       const newArr = [...input.initArray, input.newAnimal];
       return newArr;
     },

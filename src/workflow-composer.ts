@@ -362,7 +362,6 @@ export class WorkflowBuilder<
 
     const { wf, maxIdx, outputIdx } = remapWorkflowInstance(
       subWf,
-      prefix,
       ast,
       this.frontier,
       this.idx,

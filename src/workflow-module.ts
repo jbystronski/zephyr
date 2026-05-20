@@ -219,7 +219,6 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
     }> => {
       const plan = compiled[COMPILED_GRAPH][workflowId as string];
 
-      console.dir(plan, { depth: 16 });
       if (!plan) {
         throw new Error(`Workflow not found: ${String(workflowId)}`);
       }

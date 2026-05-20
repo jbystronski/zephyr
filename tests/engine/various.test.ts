@@ -4,7 +4,11 @@ import {
   createRuntimeRoot,
 } from "../../src/workflow-module";
 import { registryA } from "../utils";
-import { baseServices, StandardServices, useLog } from "../../src";
+import { baseServices, eventStream, StandardServices, useLog } from "../../src";
+
+// eventStream.subscribe((ev: any) => {
+//   console.dir(ev, { depth: 12 });
+// });
 
 type ExplorerObject = {
   label: string;
@@ -92,6 +96,13 @@ const modA = mod({
 const modC = mod({
   use: { modA },
   define: ({ wf }) => ({
+    accessChained: wf<{ nestedObject: { foo: { bar: string } } }>(
+      "access chain",
+    )
+      .init("i")
+      .seq("extract", (_) => _.object.get(_.get("i").nestedObject, "foo").bar)
+      .output((_) => _.get("extract")),
+
     createObjectsAndFind: wf<{
       keyToFind: string;
       initData: { label: string; kind: string }[];
@@ -150,6 +161,18 @@ describe("Various tests", () => {
         },
       },
     ]);
+  });
+
+  it("should access AST value chained on call expression resolution", async () => {
+    const testChained = await modCruntime.run(
+      "accessChained",
+      {
+        nestedObject: { foo: { bar: "BAZ" } },
+      },
+      [useLog()],
+    );
+
+    expect(testChained.output).toBe("BAZ");
   });
 
   it("should correctly return find explorer object if key exists", async () => {

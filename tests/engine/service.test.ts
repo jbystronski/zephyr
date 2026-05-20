@@ -85,7 +85,6 @@ describe("Service injection", () => {
         ...registryA,
         stripe: {
           async charge(amount: number) {
-            console.log("charged ", amount);
             return { paid: true, amount };
           },
         },
@@ -93,9 +92,7 @@ describe("Service injection", () => {
       meta: createMeta().service("stripe", { async: true }).build(),
     });
 
-    console.dir(parent.__public.test, { depth: 16 });
-
-    const r0 = await root.run("test", { amount: 44 }, [useLog()]);
+    const r0 = await root.run("test", { amount: 44 }, []);
 
     expect(r0.output).toEqual({ paid: true, amount: 400 });
   });

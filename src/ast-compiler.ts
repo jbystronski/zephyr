@@ -678,6 +678,38 @@ function generateExprCode(
   // CALL
   // -----------------------------------
 
+  // if (isCallExpr(expr)) {
+  //   const fn = ctx.services[expr.__service][expr.__method];
+  //
+  //   const serviceMeta = ctx.meta?.[expr.__service];
+  //   const methodMeta = serviceMeta?.methods?.[expr.__method];
+  //
+  //   const isAsync =
+  //     serviceMeta?.async === true ||
+  //     methodMeta?.async === true ||
+  //     fn.constructor?.name === "AsyncFunction";
+  //
+  //   const fnId = allocFn();
+  //
+  //   bindings[fnId] = fn;
+  //
+  //   const compiledArgs = (expr.__args ?? []).map((a) =>
+  //     generateExprCode(a, ctx, bindings, allocFn),
+  //   );
+  //
+  //   const argsCode = compiledArgs.map((a) => a.code).join(", ");
+  //
+  //   const hasAsyncArgs = compiledArgs.some((a) => a.async);
+  //
+  //   const callCode = `${fnId}(${argsCode})`;
+  //
+  //   return {
+  //     code: isAsync || hasAsyncArgs ? `await ${callCode}` : callCode,
+  //
+  //     async: isAsync || hasAsyncArgs,
+  //   };
+  // }
+
   if (isCallExpr(expr)) {
     const fn = ctx.services[expr.__service][expr.__method];
 
@@ -701,11 +733,18 @@ function generateExprCode(
 
     const hasAsyncArgs = compiledArgs.some((a) => a.async);
 
-    const callCode = `${fnId}(${argsCode})`;
+    let callCode = `${fnId}(${argsCode})`;
+
+    if (isAsync || hasAsyncArgs) {
+      callCode = `(await ${callCode})`;
+    }
+
+    for (const p of expr.__path ?? []) {
+      callCode += `?.[${JSON.stringify(p)}]`;
+    }
 
     return {
-      code: isAsync || hasAsyncArgs ? `await ${callCode}` : callCode,
-
+      code: callCode,
       async: isAsync || hasAsyncArgs,
     };
   }
