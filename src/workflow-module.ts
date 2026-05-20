@@ -1,14 +1,17 @@
 import { compileModule } from "./ast-compiler.js";
-import { executePlan } from "./executor.js";
+import { createExecutor } from "./executor.js";
 import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
 import {
   ServiceMetaRegistry,
   ServiceRegistry,
   Simplify,
+  WorkflowDef,
+  WorkflowInput,
   WorkflowObserver,
+  WorkflowOutput,
 } from "./types.js";
 
-import { createWorkflow, WorkflowDef } from "./workflow-composer.js";
+import { createWorkflow } from "./workflow-composer.js";
 
 type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
   x: infer I,
@@ -79,14 +82,14 @@ export type ServicesFromDepsRecursive<Deps extends ModuleMap> = [
       }[keyof Deps]
     >;
 
-export type WorkflowInput<W> =
-  W extends WorkflowDef<infer I, any, any, any> ? I : never;
+// export type WorkflowInput<W> =
+//   W extends WorkflowDef<infer I, any, any, any> ? I : never;
 
 export type WorkflowResults<W> =
   W extends WorkflowDef<any, infer R, any, any> ? R : never;
 
-export type WorkflowOutput<W> =
-  W extends WorkflowDef<any, any, any, infer O> ? O : never;
+// export type WorkflowOutput<W> =
+//   W extends WorkflowDef<any, any, any, infer O> ? O : never;
 
 export type ModuleContext<
   WFReg extends Record<string, WorkflowDef<any, any, any, any>>,
@@ -216,13 +219,17 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
     }> => {
       const plan = compiled[COMPILED_GRAPH][workflowId as string];
 
+      console.dir(plan, { depth: 16 });
       if (!plan) {
         throw new Error(`Workflow not found: ${String(workflowId)}`);
       }
 
+      const executor = createExecutor(plan, observers);
+
       const results = new Array(plan.maxIndex + 1);
 
-      const output = await executePlan(plan, input, results, observers);
+      const output = await executor(input, results, {});
+      // const output = await executePlan(plan, input, results, observers);
 
       return {
         output,

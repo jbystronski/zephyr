@@ -1,109 +1,26 @@
 import { createExprCtx, remapWorkflowInstance, toExpr } from "./ast.js";
-import {
+import type {
   Expr,
   ExprCtx,
   PipeMode,
   ServiceRegistry,
   Simplify,
+  StepDef,
+  StepOptions,
   StepSpec,
+  WorkflowDef,
+  WorkflowInput,
+  WorkflowOutput,
 } from "./types.js";
 import { generateWorkflowId } from "./utils.js";
 
-type WorkflowInput<T> =
-  T extends WorkflowDef<infer I, any, any, any> ? I : never;
-
 // type WorkflowOutput<T> =
 //   T extends WorkflowDef<any, any, any, any, infer O> ? O : never;
-
-type WorkflowOutput<T> =
-  T extends WorkflowDef<any, any, any, infer O>
-    ? unknown extends O
-      ? undefined
-      : O
-    : undefined;
-
-export type PipeNode = {
-  type: "pipe";
-  // input: ExprNode;
-  input: Expr;
-  mode: PipeMode;
-
-  workflow: {
-    _id: string;
-    name: string;
-
-    steps: StepDef<any>[];
-
-    //TODO: add guards here?
-    // guards: number[]
-    entrySteps: StepDef<any>[];
-    endSteps: StepDef<any>[];
-
-    aliasMap: {
-      results: Record<string, string>;
-    };
-  };
-
-  entryMap: Record<string, string>;
-  exitMap: number[];
-};
 
 export type WFConfig<Input, Services, WFReg> = {
   input: Input;
   services: Services;
   wfReg: WFReg;
-};
-
-export type StepDef<ID extends string = string> = {
-  id: ID;
-  idx: number;
-  dependsOn: number[];
-  guards?: number[];
-  // resolve: ExprNode | null;
-  resolve: Expr;
-  options?: StepOptions<any>;
-  spec?: StepSpec;
-  pipe?: PipeNode;
-};
-
-export type WorkflowDef<
-  Input,
-  Results,
-  Steps extends StepDef<any>[] = StepDef<any>[],
-  Output = undefined,
-> = {
-  name: string;
-  _id: string;
-  steps: Steps;
-  entrySteps: StepDef<any>[];
-  endSteps: StepDef<any>[];
-  input: Input;
-  results: Results;
-  outputIdx?: number;
-  initIdx?: number;
-  guards: number[];
-  aliasMap: {
-    results: Record<string, string>;
-  };
-};
-type StepRuntimeCtx<R> = {
-  results: R;
-};
-type StepOptions<Results> = {
-  retry?: number;
-  retryDelay?: number | ((attempt: number) => number);
-  timeout?: number;
-
-  continueOnError?: boolean;
-
-  onError?: (err: unknown, ctx: StepRuntimeCtx<Results>) => any;
-  pipe?: {
-    parallel?: boolean;
-  };
-
-  // optional later:
-  label?: string;
-  meta?: Record<string, any>;
 };
 
 type MergeBranchResults<
@@ -140,6 +57,8 @@ type PipeResult<Mode extends PipeMode, Item> = Mode extends "map"
         : Mode extends "count"
           ? number
           : never;
+
+type NewType<Results> = StepOptions<Results>;
 
 export class WorkflowBuilder<
   Config extends WFConfig<
@@ -203,7 +122,7 @@ export class WorkflowBuilder<
 
     resolve?: (ctx: ExprCtx<Config["services"], Results>) => R,
 
-    options?: StepOptions<Results>,
+    options?: NewType<Results>,
   ): WorkflowBuilder<
     Config,
     [...Steps, StepDef<ID>],
@@ -629,3 +548,4 @@ export function createWorkflow<
     );
   };
 }
+export { StepDef, WorkflowDef };

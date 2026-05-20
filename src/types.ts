@@ -11,13 +11,94 @@ import {
   stringLib,
 } from "./services.js";
 
-export type ExecutionFrame = {
-  stepId: string;
-  attempts: number;
-  start: number;
-  end?: number;
-  value?: any;
-  error?: any;
+export type WorkflowDef<
+  Input,
+  Results,
+  Steps extends StepDef<any>[] = StepDef<any>[],
+  Output = undefined,
+> = {
+  name: string;
+  _id: string;
+  steps: Steps;
+  entrySteps: StepDef<any>[];
+  endSteps: StepDef<any>[];
+  input: Input;
+  results: Results;
+  outputIdx?: number;
+  initIdx?: number;
+  guards: number[];
+  aliasMap: {
+    results: Record<string, string>;
+  };
+};
+
+export type PipeNode = {
+  type: "pipe";
+  // input: ExprNode;
+  input: Expr;
+  mode: PipeMode;
+
+  workflow: {
+    _id: string;
+    name: string;
+
+    steps: StepDef<any>[];
+
+    //TODO: add guards here?
+    // guards: number[]
+    entrySteps: StepDef<any>[];
+    endSteps: StepDef<any>[];
+
+    aliasMap: {
+      results: Record<string, string>;
+    };
+  };
+
+  entryMap: Record<string, string>;
+  exitMap: number[];
+};
+
+export type WorkflowInput<T> =
+  T extends WorkflowDef<infer I, any, any, any> ? I : never;
+
+export type WorkflowOutput<T> =
+  T extends WorkflowDef<any, any, any, infer O>
+    ? unknown extends O
+      ? undefined
+      : O
+    : undefined;
+
+type StepCtx<R> = {
+  results: R;
+};
+
+export type StepDef<ID extends string = string> = {
+  id: ID;
+  idx: number;
+  dependsOn: number[];
+  guards?: number[];
+  // resolve: ExprNode | null;
+  resolve: Expr;
+  options?: StepOptions<any>;
+  spec?: StepSpec;
+  pipe?: PipeNode;
+};
+
+export type StepOptions<Results> = {
+  retry?: number;
+  retryDelay?: number | ((attempt: number) => number);
+  timeout?: number;
+
+  continueOnError?: boolean;
+
+  onError?: (err: unknown, ctx: StepCtx<Results>) => any;
+  pipe?: {
+    parallel?: boolean;
+  };
+
+  // optional later:
+  label?: string;
+  meta?: Record<string, any>;
 };
 
 export type Simplify<T> = {
@@ -143,6 +224,15 @@ export type ExprCtx<S extends ServiceRegistry, Results> = ExprServiceCtx<S> & {
 // -----------------------------------
 // Compiler / Executor
 // -----------------------------------
+
+export type ExecutionFrame = {
+  stepId: string;
+  attempts: number;
+  start: number;
+  end?: number;
+  value?: any;
+  error?: any;
+};
 
 export type CompilerCtx<S = any, M = any> = {
   services: S;

@@ -603,6 +603,8 @@
 /////////////////////////  to step codegen style
 
 import { isCallExpr, isPlainObject, isRefExpr } from "./ast.js";
+import { buildLevels } from "./build-levels.js";
+
 import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
 import {
   CompiledStep,
@@ -797,6 +799,67 @@ export function compileStep(
   };
 }
 
+// export type CompiledWorkflow = {
+//   step: ExecutionPlan;
+//   fused: FusedPlan;
+// };
+// export function compileWorkflow(
+//   workflow: WorkflowDef<any, any, any, any>,
+//   ctx: CompilerCtx,
+//   fusedCache: Map<any, FusedPlan> = new Map(),
+// ): CompiledWorkflow {
+//   let outputIndex: number | undefined;
+//   let exitIndexes: number[] | undefined;
+//
+//   if (workflow.outputIdx !== undefined) {
+//     outputIndex = workflow.outputIdx;
+//   } else if (workflow.endSteps?.length) {
+//     exitIndexes = workflow.endSteps.map((s) => s.idx);
+//   }
+//
+//   // -------------------------------
+//   // STEP MODE
+//   // -------------------------------
+//   const compiledSteps = workflow.steps.map((step: any) => {
+//     if (step.pipe?.workflow) {
+//       const child = compileWorkflow(step.pipe.workflow, ctx, fusedCache);
+//
+//       return {
+//         ...step,
+//         pipe: {
+//           ...step.pipe,
+//           plan: child.step,
+//         },
+//       };
+//     }
+//     return step;
+//   });
+//
+//   const levels = buildLevels(compiledSteps);
+//
+//   const stepPlan: ExecutionPlan = {
+//     levels: levels.map((l) => l.map((s) => compileStep(s, ctx))),
+//     outputIndex,
+//     exitIndexes: exitIndexes ?? [],
+//     maxIndex: Math.max(...workflow.steps.map((s: any) => s.idx)),
+//   };
+//
+//   // -------------------------------
+//   // FUSED MODE (memoized)
+//   // -------------------------------
+//   let fused = fusedCache.get(workflow);
+//
+//   if (!fused) {
+//     fused = compileWorkflowFused(workflow, ctx, fusedCache);
+//     fusedCache.set(workflow, fused);
+//   }
+//
+//   return {
+//     step: stepPlan,
+//     fused,
+//   };
+// }
+
 export function compileWorkflow(
   workflow: WorkflowDef<any, any, any, any>,
   ctx: CompilerCtx,
@@ -867,50 +930,4 @@ export function compileModule(mod: any, services: any, meta?: any): any {
 
     [COMPILED_GRAPH]: compiledGraph,
   };
-}
-
-export function buildLevels(steps: StepDef<any>[]): StepDef<any>[][] {
-  const remainingDeps = new Map<number, number>();
-  const dependents = new Map<number, number[]>();
-  const ready: number[] = [];
-
-  const stepByIdx = new Map(steps.map((s) => [s.idx, s]));
-
-  for (const step of steps) {
-    remainingDeps.set(step.idx, step.dependsOn.length);
-
-    if (step.dependsOn.length === 0) {
-      ready.push(step.idx);
-    }
-
-    for (const dep of step.dependsOn) {
-      if (!dependents.has(dep)) {
-        dependents.set(dep, []);
-      }
-
-      dependents.get(dep)!.push(step.idx);
-    }
-  }
-
-  const levels: StepDef<any>[][] = [];
-
-  while (ready.length > 0) {
-    const batch = ready.splice(0);
-
-    levels.push(batch.map((idx) => stepByIdx.get(idx)!));
-
-    for (const idx of batch) {
-      for (const child of dependents.get(idx) ?? []) {
-        const left = remainingDeps.get(child)! - 1;
-
-        remainingDeps.set(child, left);
-
-        if (left === 0) {
-          ready.push(child);
-        }
-      }
-    }
-  }
-
-  return levels;
 }

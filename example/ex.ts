@@ -212,61 +212,76 @@ const testPipe = createMod({
           },
         },
       }))
-      .parallel(
+      .if(
+        "GUARD",
+        (_) => _.logic.eq(true, true),
         (b) =>
-          b.pipe(
-            "first P",
-            "map",
-            (_) => _.get("init").nestedArr,
-            (b) =>
-              b
-                .init("p entry")
-                .seq("suffix", (_) =>
-                  _.std.concat(_.get("p entry").name, "!!!!!"),
-                )
-                .pipe(
-                  "nested pipe",
+          b
+            .seq("GUARD first step", (_) =>
+              _.math.add(2, _.get("deep nested expr").second.bar.baz),
+            )
+            .parallel(
+              (b) =>
+                b.pipe(
+                  "first P",
                   "map",
-                  (_) => _.get("p entry").arr,
+                  (_) => _.get("init").nestedArr,
                   (b) =>
                     b
-                      .init("nested p entry")
-                      .seq("add pref", (_) =>
-                        _.std.concat(_.get("nested p entry"), _.get("suffix")),
-                      ),
-                )
-                .seq("final", (_) => ({
-                  outer: _.get("suffix"),
-                  arr: _.get("nested pipe"),
-                })),
-          ),
-        (b) =>
-          b.pipe(
-            "second P",
-            "map",
-            (_) => _.get("init").secondArr,
-            (b) =>
-              b
-                .init("second p entry")
-                .seq("suffix", (_) =>
-                  _.std.concat(_.get("second p entry").name, "$"),
-                )
-                .pipe(
-                  "nested second pipe",
+                      .init("p entry")
+                      .seq("suffix", (_) =>
+                        _.std.concat(_.get("p entry").name, "!!!!!"),
+                      )
+                      .pipe(
+                        "nested pipe",
+                        "map",
+                        (_) => _.get("p entry").arr,
+                        (b) =>
+                          b
+                            .init("nested p entry")
+                            .seq("add pref", (_) =>
+                              _.std.concat(
+                                _.get("nested p entry"),
+                                _.get("suffix"),
+                              ),
+                            ),
+                      )
+                      .seq("final", (_) => ({
+                        outer: _.get("suffix"),
+                        arr: _.get("nested pipe"),
+                      })),
+                ),
+              (b) =>
+                b.pipe(
+                  "second P",
                   "map",
-                  (_) => _.get("second p entry").arr,
+                  (_) => _.get("init").secondArr,
                   (b) =>
                     b
-                      .init("nested second p entry")
-                      .seq("add pref again", (_) =>
-                        _.std.concat(_.get("nested second p entry"), ">>"),
-                      ),
-                )
-                .seq("final second", (_) => ({
-                  outer: _.get("suffix"),
-                  arr: _.get("nested second pipe"),
-                })),
-          ),
+                      .init("second p entry")
+                      .seq("suffix", (_) =>
+                        _.std.concat(_.get("second p entry").name, "$"),
+                      )
+                      .pipe(
+                        "nested second pipe",
+                        "map",
+                        (_) => _.get("second p entry").arr,
+                        (b) =>
+                          b
+                            .init("nested second p entry")
+                            .seq("add pref again", (_) =>
+                              _.std.concat(
+                                _.get("nested second p entry"),
+                                ">>",
+                              ),
+                            ),
+                      )
+                      .seq("final second", (_) => ({
+                        outer: _.get("suffix"),
+                        arr: _.get("nested second pipe"),
+                      })),
+                ),
+            ),
       )
 
       .join()
@@ -320,7 +335,7 @@ const s = baseServices
 
   .build();
 
-console.dir(testPipe.__public.test, { depth: 16 });
+// console.dir(testPipe.__public.test, { depth: 16 });
 
 const r0 = createRuntimeRoot({
   module: testPipe,
@@ -358,18 +373,20 @@ const r = await r0.run(
       },
     ],
   },
-  [useLog()],
+  [],
 );
 
-console.dir(r, { depth: 16 });
+// console.dir(r, { depth: 16 });
 //
-// const r2 = await r0.run(
-//   "filterSome",
-//   {
-//     selected: ["1", "2"],
-//     all: ["1", "2", "4", "6"],
-//   },
-//   [useLog()],
-// );
-//
+const r2 = await r0.run(
+  "filterSome",
+  {
+    selected: ["1", "2"],
+    all: ["1", "2", "4", "6"],
+  },
+  [],
+);
+
 // console.log(r2);
+
+// console.dir(testPipe.__public.filterSome, { depth: 16 });

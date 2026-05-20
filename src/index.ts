@@ -2,6 +2,7 @@ export * from "./event-stream.js";
 
 export * from "./workflow-composer.js";
 export * from "./workflow-module.js";
+export * from "./build-levels.js";
 
 export {
   exposeAll,
