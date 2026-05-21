@@ -459,35 +459,6 @@ export const objectLib = {
     return out;
   },
 
-  setAtPath: (obj: any, path: string, value: any): void => {
-    const keys = path.split(".");
-    const lastKey = keys.pop();
-
-    const target = keys.reduce((acc, key) => {
-      const match = key.match(/^(\w+)\[(\d+)\]$/);
-      if (match) {
-        const [, arrKey, index] = match;
-        if (!acc[arrKey]) acc[arrKey] = [];
-        if (!acc[arrKey][Number(index)]) acc[arrKey][Number(index)] = {};
-        return acc[arrKey][Number(index)];
-      }
-
-      if (!acc[key]) acc[key] = {};
-      return acc[key];
-    }, obj);
-
-    if (!lastKey) return;
-
-    const match = lastKey.match(/^(\w+)\[(\d+)\]$/);
-    if (match) {
-      const [, arrKey, index] = match;
-      if (!target[arrKey]) target[arrKey] = [];
-      target[arrKey][Number(index)] = value;
-    } else {
-      target[lastKey] = value;
-    }
-  },
-
   setIfChanged: (key: string, prev: any, next: any): Record<string, any> => {
     return Object.is(prev, next) ? {} : { [key]: next };
   },

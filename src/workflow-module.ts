@@ -228,10 +228,7 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
       const results = new Array(plan.maxIndex + 1);
       // results.fill(UNSET);
 
-      console.log("init idx", plan.initIdx);
       if (typeof plan.initIdx === "number") {
-        console.log("setting input  to ", plan.initIdx);
-        console.log(input);
         results[plan.initIdx] = input;
       }
 

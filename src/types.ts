@@ -255,7 +255,7 @@ export type ExecutionFrame = {
   error?: any;
 };
 
-export type CompilerCtx<S = any, M = any> = {
+export type CompilerCtx<M = any> = {
   meta: M;
 };
 
@@ -275,7 +275,6 @@ export type CompiledStep = {
   deps: number[];
   guards: number[];
   spec?: StepSpec;
-  // resolve: CompiledExpr | null;
   resolve: StepExecutor | null;
   pipe?: {
     mode: PipeMode;
@@ -284,7 +283,6 @@ export type CompiledStep = {
 };
 
 export type StepRuntimeCtx = {
-  // input: any;
   services: Record<string, any>;
   results: ResultsArray;
   observers: any[];

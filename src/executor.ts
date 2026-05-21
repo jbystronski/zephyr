@@ -134,15 +134,12 @@ async function runPipeWorkflow(
   const results = new Array(plan.maxIndex + 1) as ResultsArray;
   // results.fill(UNSET);
 
-  // IMPORTANT: preserve parent chain semantics
-  // results.__parent = parentResults;
   results.__parent = rt.results;
 
   if (typeof plan.initIdx === "number") {
     results[plan.initIdx] = input;
   }
 
-  // console.log("RESULTS BEF PIPE", results);
   const rtBase: StepRuntimeCtx = {
     services: rt.services,
     results,
