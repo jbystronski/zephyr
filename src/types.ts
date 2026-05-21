@@ -17,19 +17,19 @@ export type WorkflowDef<
   Steps extends StepDef<any>[] = StepDef<any>[],
   Output = undefined,
 > = {
-  name: string;
+  name?: string;
   _id: string;
   steps: Steps;
-  entrySteps: StepDef<any>[];
+  // entrySteps: StepDef<any>[];
   endSteps: StepDef<any>[];
-  input: Input;
-  results: Results;
+  // input: Input;
+  // results: Results;
   outputIdx?: number;
   initIdx?: number;
   guards: number[];
-  aliasMap: {
-    results: Record<string, string>;
-  };
+  // aliasMap: {
+  //   results: Record<string, string>;
+  // };
 };
 
 export type WFConfig<Input, Services, WFReg> = {
@@ -51,28 +51,28 @@ export type PipeResult<Mode extends PipeMode, Item> = Mode extends "map"
           : never;
 
 export type PipeNode = {
-  type: "pipe";
+  // type: "pipe";
   // input: ExprNode;
-  input: Expr;
+  // input: Expr;
   mode: PipeMode;
 
   workflow: {
     _id: string;
-    name: string;
+    // name: string;
 
     steps: StepDef<any>[];
 
     //TODO: add guards here?
     // guards: number[]
-    entrySteps: StepDef<any>[];
+    // entrySteps: StepDef<any>[];
     endSteps: StepDef<any>[];
 
-    aliasMap: {
-      results: Record<string, string>;
-    };
+    // aliasMap: {
+    //   results: Record<string, string>;
+    // };
   };
 
-  entryMap: Record<string, string>;
+  // entryMap: Record<string, string>;
   exitMap: number[];
 };
 
@@ -262,6 +262,7 @@ export type CompilerCtx<S = any, M = any> = {
 export type ResultsArray = any[] & { __parent?: ResultsArray };
 
 export type ExecutionPlan = {
+  initIdx?: number;
   levels: CompiledStep[][];
   outputIndex?: number;
   exitIndexes: number[];
@@ -283,7 +284,7 @@ export type CompiledStep = {
 };
 
 export type StepRuntimeCtx = {
-  input: any;
+  // input: any;
   services: Record<string, any>;
   results: ResultsArray;
   observers: any[];

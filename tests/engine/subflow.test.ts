@@ -78,7 +78,7 @@ describe("Subflow", () => {
       },
     });
 
-    const res = await root.run("test", {}, []);
+    const res = await root.run("test", {}, [useLog()]);
 
     // const childRes = childRt.run("sum")
     expect(res.output).toBe(5);

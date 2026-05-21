@@ -59,7 +59,7 @@ export class WorkflowBuilder<
   private frontier: number[] = [];
   private idToIdx: Record<string, number> = {};
   private idx = 0;
-  private initIdx? = 0;
+  private initIdx?: number | undefined = undefined;
   private outputIdx?: number;
 
   constructor(
@@ -190,7 +190,7 @@ export class WorkflowBuilder<
 
     const wfId = generateWorkflowId(id);
 
-    const entrySteps = built.steps.filter((s) => s.dependsOn.length === 0);
+    // const entrySteps = built.steps.filter((s) => s.dependsOn.length === 0);
 
     const hasDependents = new Set<number>();
     for (const step of built.steps) {
@@ -210,16 +210,17 @@ export class WorkflowBuilder<
       _id: wfId,
       guards: built.guards,
 
-      input: { type: "pipe_input", value: pipeInputAst },
-      results: {} as Results,
-      name: `${id}_pipe`,
+      // input: { type: "pipe_input", value: pipeInputAst },
+      // results: {} as Results,
+      // name: `${id}_pipe`,
       steps: built.steps,
+      initIdx: built.initIdx,
 
-      aliasMap: {
-        results: Object.fromEntries(built.steps.map((s) => [s.id, s.idx])),
-      },
+      // aliasMap: {
+      //   results: Object.fromEntries(built.steps.map((s) => [s.id, s.idx])),
+      // },
 
-      entrySteps,
+      // entrySteps,
       endSteps,
     };
 
@@ -236,13 +237,12 @@ export class WorkflowBuilder<
 
       resolve: pipeInputAst,
       pipe: {
-        type: "pipe",
         mode,
 
-        input: pipeInputAst,
+        // input: pipeInputAst,
         workflow: subWf,
 
-        entryMap: Object.fromEntries(entrySteps.map((s) => [s.id, s.idx])),
+        // entryMap: Object.fromEntries(entrySteps.map((s) => [s.id, s.idx])),
         exitMap: endSteps.map((s) => s.idx),
       },
       options,
@@ -484,17 +484,17 @@ export class WorkflowBuilder<
       name: this.name,
 
       steps: this.steps as Steps,
-      entrySteps: this.steps.filter((s) => s.dependsOn.length === 0),
+      // entrySteps: this.steps.filter((s) => s.dependsOn.length === 0),
       endSteps: this.getEndSteps(),
 
       guards: this.guards,
       outputIdx: this.outputIdx,
       initIdx: this.initIdx,
-      input: {} as Config["input"],
-      results: {} as Results,
-      aliasMap: {
-        results: Object.fromEntries(this.steps.map((s) => [s.id, s.idx])),
-      },
+      // input: {} as Config["input"],
+      // results: {} as Results,
+      // aliasMap: {
+      //   results: Object.fromEntries(this.steps.map((s) => [s.id, s.idx])),
+      // },
     };
   }
 

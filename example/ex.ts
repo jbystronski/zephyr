@@ -75,11 +75,11 @@ const createMod = createModuleFactory<
 const subMod = createMod({
   define: ({ wf }) => ({
     addTen: wf<{ someNumbers: number[] }>("add ten")
-      .init("i")
+      .init("init to addTen")
       .pipe(
         "add 10 pipe",
         "map",
-        (_) => _.get("i").someNumbers,
+        (_) => _.get("init to addTen").someNumbers,
         (b) =>
           b
             .init("processed entry")
@@ -342,7 +342,7 @@ const r0 = createRuntimeRoot({
   services: s,
 });
 
-// console.dir(testPipe.__public.test, { depth: 12 });
+console.dir(testPipe.__public.test, { depth: 12 });
 
 const r = await r0.run(
   "test",
@@ -373,20 +373,20 @@ const r = await r0.run(
       },
     ],
   },
-  [],
+  [useLog()],
 );
 
-console.dir(r, { depth: 16 });
+console.dir(r.output, { depth: 16 });
 //
-const r2 = await r0.run(
-  "filterSome",
-  {
-    selected: ["1", "2"],
-    all: ["1", "2", "4", "6"],
-  },
-  [],
-);
-
-console.log(r2);
+// const r2 = await r0.run(
+//   "filterSome",
+//   {
+//     selected: ["1", "2"],
+//     all: ["1", "2", "4", "6"],
+//   },
+//   [],
+// );
+//
+// console.log(r2);
 
 // console.dir(testPipe.__public.filterSome, { depth: 16 });

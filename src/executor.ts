@@ -1,5 +1,6 @@
 import { readResult } from "./ast-compiler.js";
 import { composeObserver } from "./observer.js";
+import { UNSET } from "./symbols.js";
 import {
   CompiledStep,
   ExecutionFrame,
@@ -23,29 +24,24 @@ function createFastExecutor(
   plan: ExecutionPlan,
   services: Record<string, any>,
 ) {
-  return async function executePlanFast(input: any, results: ResultsArray) {
-    const rootRt = {
-      input,
+  return async function executePlanFast(results: ResultsArray) {
+    const rt = {
       services,
       results,
       observers: [],
-      frame: undefined,
     };
 
     for (const level of plan.levels) {
       await Promise.all(
         level.map(async (step) => {
-          if (!checkGuards(step.guards, rootRt)) {
+          if (!checkGuards(step.guards, rt)) {
             results[step.idx] = undefined;
             return;
           }
 
-          const rt = {
-            ...rootRt,
-            frame: undefined,
-          };
-
-          results[step.idx] = await executeStep(step, rt);
+          if (results[step.idx] === undefined) {
+            results[step.idx] = await executeStep(step, rt);
+          }
         }),
       );
     }
@@ -62,12 +58,10 @@ function createObservedExecutor(
   const observerFn = composeObserver(observers);
 
   return async function executePlanObserved(
-    input: any,
     results: ResultsArray,
     extras: Record<string, unknown>,
   ) {
     const rootRt = {
-      input,
       services,
       results,
       observers,
@@ -85,6 +79,7 @@ function createObservedExecutor(
 
           const rt = {
             ...rootRt,
+
             frame,
           };
 
@@ -96,20 +91,22 @@ function createObservedExecutor(
           const run = async () => {
             frame.attempts++;
 
-            const value = await executeStep(step, rt);
-            results[step.idx] = value;
+            if (results[step.idx] === undefined) {
+              const value = await executeStep(step, rt);
+              results[step.idx] = value;
+            }
 
-            frame.value = value;
+            frame.value = results[step.idx];
             frame.end = Date.now();
 
-            return value;
+            return results[step.idx];
           };
 
           try {
             await observerFn(
               {
                 stepId: `${step.idx}`,
-                input,
+
                 results,
                 extras,
                 frame,
@@ -133,17 +130,20 @@ async function runPipeWorkflow(
   plan: ExecutionPlan,
   input: any,
   rt: StepRuntimeCtx,
-  // services: Record<string, any>,
-  // parentResults: ResultsArray,
-  // observers: WorkflowObserver[],
 ) {
   const results = new Array(plan.maxIndex + 1) as ResultsArray;
+  // results.fill(UNSET);
 
   // IMPORTANT: preserve parent chain semantics
   // results.__parent = parentResults;
   results.__parent = rt.results;
+
+  if (typeof plan.initIdx === "number") {
+    results[plan.initIdx] = input;
+  }
+
+  // console.log("RESULTS BEF PIPE", results);
   const rtBase: StepRuntimeCtx = {
-    input,
     services: rt.services,
     results,
     observers: rt.observers,
@@ -163,7 +163,9 @@ async function runPipeWorkflow(
           frame: undefined,
         };
 
-        results[step.idx] = await executeStep(step, rt);
+        if (results[step.idx] === undefined) {
+          results[step.idx] = await executeStep(step, rt);
+        }
       }),
     );
   }
@@ -172,96 +174,84 @@ async function runPipeWorkflow(
 }
 
 async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
-  switch (step.spec) {
-    case "__init__": {
-      if (!step.resolve) {
-        return rt.input;
+  if (step?.spec === "__pipe__") {
+    const items = step.resolve ? await step.resolve(rt) : [];
+    const list = Array.isArray(items) ? items : [];
+
+    let mode: PipeMode = step.pipe?.mode ?? "map";
+
+    switch (mode) {
+      case "map":
+        const res = await Promise.all(
+          list.map((item, i) => runPipeWorkflow(step.pipe?.plan!, item, rt)),
+        );
+
+        return res;
+
+      case "filter": {
+        const res = [];
+
+        for (let i = 0; i < list.length; i++) {
+          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+
+          if (out) {
+            res.push(list[i]);
+          }
+        }
+
+        return res;
+      }
+      case "find": {
+        for (let i = 0; i < list.length; i++) {
+          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+
+          if (out) {
+            return list[i];
+          }
+        }
+
+        return undefined;
       }
 
-      return step.resolve ? await step.resolve(rt) : undefined;
-    }
+      case "some": {
+        for (let i = 0; i < list.length; i++) {
+          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
 
-    case "__pipe__": {
-      const items = step.resolve ? await step.resolve(rt) : [];
-      const list = Array.isArray(items) ? items : [];
-
-      let mode: PipeMode = step.pipe?.mode ?? "map";
-
-      switch (mode) {
-        case "map":
-          const res = await Promise.all(
-            list.map((item, i) => runPipeWorkflow(step.pipe?.plan!, item, rt)),
-          );
-
-          return res;
-
-        case "filter": {
-          const res = [];
-
-          for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
-
-            if (out) {
-              res.push(list[i]);
-            }
+          if (out) {
+            return true;
           }
-
-          return res;
-        }
-        case "find": {
-          for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
-
-            if (out) {
-              return list[i];
-            }
-          }
-
-          return undefined;
         }
 
-        case "some": {
-          for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
-
-            if (out) {
-              return true;
-            }
-          }
-
-          return false;
-        }
-
-        case "every": {
-          for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
-
-            if (!out) {
-              return false;
-            }
-          }
-
-          return true;
-        }
-
-        case "count": {
-          let count = 0;
-
-          for (let i = 0; i < list.length; i++) {
-            const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
-
-            if (out) count++;
-          }
-
-          return count;
-        }
+        return false;
       }
-    }
 
-    default: {
-      return step.resolve ? await step.resolve(rt) : undefined;
+      case "every": {
+        for (let i = 0; i < list.length; i++) {
+          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+
+          if (!out) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      case "count": {
+        let count = 0;
+
+        for (let i = 0; i < list.length; i++) {
+          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+
+          if (out) count++;
+        }
+
+        return count;
+      }
     }
   }
+
+  return step.resolve ? await step.resolve(rt) : undefined;
 }
 
 function checkGuards(guards: number[] | undefined, rt: StepRuntimeCtx) {

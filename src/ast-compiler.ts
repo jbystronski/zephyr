@@ -510,6 +510,7 @@ export function compileWorkflow(
   const maxIndex = Math.max(...workflow.steps.map((s: any) => s.idx));
 
   return {
+    initIdx: workflow.initIdx ?? undefined,
     levels: compiledLevels,
     outputIndex,
     exitIndexes: exitIndexes ?? [],

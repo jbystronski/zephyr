@@ -171,7 +171,7 @@ describe("Various tests", () => {
       {
         nestedObject: { foo: { bar: "BAZ" } },
       },
-      [useLog()],
+      [],
     );
 
     expect(testChained.output).toBe("BAZ");
@@ -187,7 +187,7 @@ describe("Various tests", () => {
         ],
         keyToFind: "emails",
       },
-      [],
+      [useLog()],
     );
 
     expect(testTwo.output.found).toEqual({

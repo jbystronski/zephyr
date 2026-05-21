@@ -1,16 +1,21 @@
-class ZephyrEventStream {
-  private listeners: ((evt: any) => void)[] = [];
+class EventStream {
+  private listeners = new Set<(evt: any) => void>();
 
   emit(evt: any) {
     for (const l of this.listeners) l(evt);
   }
 
   subscribe(listener: (evt: any) => void) {
-    this.listeners.push(listener);
+    this.listeners.add(listener);
+
     return () => {
-      this.listeners = this.listeners.filter((l) => l !== listener);
+      this.listeners.delete(listener);
     };
+  }
+
+  clear() {
+    this.listeners.clear();
   }
 }
 
-export const eventStream = new ZephyrEventStream();
+export const eventStream = new EventStream();

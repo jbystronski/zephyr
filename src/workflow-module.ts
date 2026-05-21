@@ -1,6 +1,6 @@
 import { compileModule } from "./ast-compiler.js";
 import { createExecutor } from "./executor.js";
-import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
+import { COMPILED_GRAPH, DEPS, EXEC_GRAPH, UNSET } from "./symbols.js";
 import {
   ServiceMetaRegistry,
   ServiceRegistry,
@@ -226,8 +226,16 @@ export function createRuntimeRoot<M extends Module<any, any, any, any>>({
       const executor = createExecutor(plan, services, observers);
 
       const results = new Array(plan.maxIndex + 1);
+      // results.fill(UNSET);
 
-      const output = await executor(input, results, {});
+      console.log("init idx", plan.initIdx);
+      if (typeof plan.initIdx === "number") {
+        console.log("setting input  to ", plan.initIdx);
+        console.log(input);
+        results[plan.initIdx] = input;
+      }
+
+      const output = await executor(results, {});
       // const output = await executePlan(plan, input, results, observers);
 
       return {

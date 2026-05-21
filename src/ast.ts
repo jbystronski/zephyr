@@ -256,6 +256,13 @@ export function offsetWorkflow(obj: any, offset: number) {
     for (const key in node) {
       const value = node[key];
 
+      if (key === "initIdx" && typeof value === "number") {
+        const newIdx = value + offset;
+        out[key] = newIdx;
+        if (newIdx > maxIdx) maxIdx = newIdx;
+        continue;
+      }
+
       if (key === "idx" && typeof value === "number") {
         const newIdx = value + offset;
         out[key] = newIdx;
