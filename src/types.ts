@@ -10,6 +10,8 @@ import {
   stdLib,
   stringLib,
 } from "./services.js";
+import { DEPS, EXEC_GRAPH, MODULE_ID } from "./symbols.js";
+import { createWorkflow } from "./workflow-composer.js";
 
 export type WorkflowDef<
   Input,
@@ -18,7 +20,7 @@ export type WorkflowDef<
   Output = undefined,
 > = {
   name?: string;
-  _id: string;
+  __id: string;
   steps: Steps;
   // entrySteps: StepDef<any>[];
   endSteps: StepDef<any>[];
@@ -32,10 +34,9 @@ export type WorkflowDef<
   // };
 };
 
-export type WFConfig<Input, Services, WFReg> = {
+export type WFConfig<Input, Services> = {
   input: Input;
   services: Services;
-  wfReg: WFReg;
 };
 
 export type PipeResult<Mode extends PipeMode, Item> = Mode extends "map"
@@ -57,7 +58,7 @@ export type PipeNode = {
   mode: PipeMode;
 
   workflow: {
-    _id: string;
+    __id: string;
     // name: string;
 
     steps: StepDef<any>[];
@@ -123,7 +124,7 @@ export type Simplify<T> = {
   [K in keyof T]: T[K];
 } & {};
 
-export type WorkflowObserver<S extends ServiceRegistry = any> = {
+export type WorkflowObserver = {
   (
     ctx: {
       stepId: string;
@@ -194,6 +195,37 @@ export type StepSpec =
   | "__join__";
 
 export type PipeMode = "map" | "filter" | "find" | "some" | "every" | "count";
+
+// -----------------------------------
+// UTILS
+// -----------------------------------
+
+type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
+  x: infer I,
+) => any
+  ? I
+  : never;
+
+// -----------------------------------
+// MODULE
+// -----------------------------------
+
+export type WorkflowResults<W> =
+  W extends WorkflowDef<any, infer R, any, any> ? R : never;
+
+export type ModuleContext<Deps, S extends ServiceRegistry> = {
+  wf: ReturnType<typeof createWorkflow<S>>;
+  deps: Deps;
+};
+
+declare const __services: unique symbol;
+
+export type Module<
+  S extends ServiceRegistry,
+  WF extends Record<string, WorkflowDef<any, any, any, any>>,
+> = WF & {
+  readonly [__services]: S;
+};
 
 // -----------------------------------
 // AST
@@ -283,7 +315,7 @@ export type CompiledStep = {
 };
 
 export type StepRuntimeCtx = {
-  services: Record<string, any>;
+  services: Record<string, unknown>;
   results: ResultsArray;
   observers: any[];
   frame?: ExecutionFrame;
@@ -298,3 +330,33 @@ export type CompiledExpr =
   | ((rt: StepRuntimeCtx) => any | Promise<any>);
 
 export type StepExecutor = (rt: StepRuntimeCtx) => any;
+
+export type ExtractServices<M> = M extends { [__services]: infer S }
+  ? S
+  : never;
+
+export type RuntimeServices<MM extends Record<string, Module<any, any>>> =
+  UnionToIntersection<ExtractServices<MM[keyof MM]>>;
+
+export type RuntimeOptions<MM extends Record<string, Module<any, any>>> = {
+  global?: {
+    precompile?: boolean;
+    observers?: WorkflowObserver[];
+  };
+
+  modules?: {
+    [M in keyof MM]?: {
+      precompile?: boolean;
+      observers?: WorkflowObserver[];
+    };
+  };
+
+  workflows?: {
+    [M in keyof MM]?: {
+      [W in keyof MM[M]]?: {
+        precompile?: boolean;
+        observers?: WorkflowObserver[];
+      };
+    };
+  };
+};

@@ -5,17 +5,17 @@ import {
   createModuleFactory,
   createRuntimeRoot,
 } from "../../src/workflow-module";
-import { registryA } from "../utils";
-import { useLog } from "../../src";
 
-const createMod = createModuleFactory<typeof registryA>();
+import { baseServices, StandardServices, useLog } from "../../src";
+
+const createMod = createModuleFactory<StandardServices>();
 
 const child = createMod({
   define: ({ wf }) => {
     const childWfOne = wf<{ a: number; b: number }>("one")
       .init("one_init")
       .seq("add", (ctx) =>
-        ctx.actions.add(ctx.get("one_init").a, ctx.get("one_init").b),
+        ctx.math.add(ctx.get("one_init").a, ctx.get("one_init").b),
       )
 
       .output((ctx) => ctx.get("add"));
@@ -26,10 +26,10 @@ const child = createMod({
 
 const parent = createMod({
   use: { child },
-  expose: { aliased: "child.childWfOne" },
-  define: ({ wf }) => {
+  expose: { aliased: child.childWfOne },
+  define: ({ wf, deps: { child } }) => {
     const test = wf("test")
-      .sub("result", "child.childWfOne", () => ({ a: 10, b: 10 }))
+      .sub("result", child.childWfOne, () => ({ a: 10, b: 10 }))
       .output((ctx) => ctx.get("result"));
 
     return { test };
@@ -39,11 +39,11 @@ const parent = createMod({
 describe("Expose", () => {
   it("should execute workflow with alias", async () => {
     const root = createRuntimeRoot({
-      module: parent,
-      services: { ...registryA },
+      modules: { parent },
+      services: baseServices.build(),
     });
 
-    const res = await root.run("aliased", { a: 10, b: 10 }, []);
+    const res = await root.run("parent", "aliased", { a: 10, b: 10 });
 
     expect(res.output).toBe(20);
   });

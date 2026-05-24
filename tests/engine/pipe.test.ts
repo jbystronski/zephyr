@@ -5,7 +5,7 @@ import {
   createModuleFactory,
   createRuntimeRoot,
 } from "../../src/workflow-module";
-import { registryA } from "../utils";
+
 import { baseServices, StandardServices, useLog } from "../../src";
 type S1 = {
   addAnimal: (input: { initArray: string[]; newAnimal: string }) => string[];
@@ -183,26 +183,24 @@ const s = baseServices
   .build();
 
 const r0 = createRuntimeRoot({
-  module: testPipe,
+  modules: { testPipe },
   services: s,
 });
 
 describe("Pipe", () => {
   it("should execute pipe and return result", async () => {
-    const res = await r0.run(
-      "test",
-      {
-        elements: ["cat", "dog", "bird"],
-        another: "fish",
-      },
-      [],
-    );
+    const res = await r0.run("testPipe", "test", {
+      elements: ["cat", "dog", "bird"],
+      another: "fish",
+    });
 
     expect(res.output).toEqual(["<CAT>!", "<DOG>!", "<BIRD>!", "<FISH>!"]);
   });
 
   it("should return first matching result from pipe", async () => {
-    const r = await r0.run("findFirstArcticBird", { data: transformables });
+    const r = await r0.run("testPipe", "findFirstArcticBird", {
+      data: transformables,
+    });
 
     expect(r.output).toEqual({
       name: "penguin",
@@ -212,19 +210,25 @@ describe("Pipe", () => {
   });
 
   it("should evaluate some pipe condtion to true", async () => {
-    const r = await r0.run("someAreTropical", { data: transformables });
+    const r = await r0.run("testPipe", "someAreTropical", {
+      data: transformables,
+    });
 
     expect(r.output).toBe(true);
   });
 
   it("should evaluate every pipe condtion to false", async () => {
-    const r = await r0.run("everyIsArctic", { data: transformables });
+    const r = await r0.run("testPipe", "everyIsArctic", {
+      data: transformables,
+    });
 
     expect(r.output).toBe(false);
   });
 
   it("should filter reptiles", async () => {
-    const r = await r0.run("reptilesOnly", { data: transformables });
+    const r = await r0.run("testPipe", "reptilesOnly", {
+      data: transformables,
+    });
 
     expect(r.output).toEqual([
       {

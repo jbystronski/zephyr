@@ -3,7 +3,6 @@
 import { describe, it, expect } from "vitest";
 
 import { createModuleFactory, createRuntimeRoot } from "../../src";
-import { registryA } from "../utils";
 
 const calls: string[] = [];
 
@@ -33,8 +32,8 @@ describe("Parallel execution", () => {
       }),
     });
 
-    const rt = createRuntimeRoot({ module: mod, services: { ...local } });
-    await rt.run("test", {});
+    const rt = createRuntimeRoot({ modules: { mod }, services: { ...local } });
+    await rt.run("mod", "test", {});
 
     expect(calls.sort()).toEqual(["A", "B", "C"]);
   });

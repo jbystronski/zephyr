@@ -43,11 +43,7 @@ type MergeBranchSteps<
 type NewType<Results> = StepOptions<Results>;
 
 export class WorkflowBuilder<
-  Config extends WFConfig<
-    unknown,
-    ServiceRegistry,
-    Record<string, WorkflowDef<any, any, any, any>>
-  >,
+  Config extends WFConfig<unknown, ServiceRegistry>,
   Steps extends StepDef<any>[] = [],
   Results = {},
   CurrentIds extends string = never,
@@ -62,10 +58,7 @@ export class WorkflowBuilder<
   private initIdx?: number | undefined = undefined;
   private outputIdx?: number;
 
-  constructor(
-    private name: string,
-    private wfRegistry?: Config["wfReg"],
-  ) {}
+  constructor(private name: string) {}
 
   init<ID extends string>(id: ID) {
     if (this.initIdx && this.initIdx > 0) {
@@ -143,7 +136,7 @@ export class WorkflowBuilder<
     Mode extends PipeMode,
     Arr extends any[],
     Branch extends WorkflowBuilder<
-      WFConfig<Arr[number], Config["services"], Config["wfReg"]>,
+      WFConfig<Arr[number], Config["services"]>,
       any,
       any,
       any
@@ -155,7 +148,7 @@ export class WorkflowBuilder<
 
     builder: (
       b: WorkflowBuilder<
-        WFConfig<Arr[number], Config["services"], Config["wfReg"]>,
+        WFConfig<Arr[number], Config["services"]>,
         [],
         Results
       >,
@@ -174,10 +167,10 @@ export class WorkflowBuilder<
     const deps = [...this.frontier];
 
     const branchBuilder = new WorkflowBuilder<
-      WFConfig<Arr[number], Config["services"], Config["wfReg"]>,
+      WFConfig<Arr[number], Config["services"]>,
       [],
       Results
-    >(this.name, this.wfRegistry);
+    >(this.name);
 
     branchBuilder.idx = this.idx;
     branchBuilder.frontier = [];
@@ -207,7 +200,7 @@ export class WorkflowBuilder<
     const pipeInputAst = pipeExpr != null ? toExpr(pipeExpr) : null;
 
     const subWf: WorkflowDef<any, any, any, any> = {
-      _id: wfId,
+      __id: wfId,
       guards: built.guards,
 
       // input: { type: "pipe_input", value: pipeInputAst },
@@ -290,11 +283,7 @@ export class WorkflowBuilder<
     const mergedIdMap = { ...this.idToIdx };
 
     branches.forEach((branch) => {
-      const b = new WorkflowBuilder<Config, [], Results>(
-        this.name,
-
-        this.wfRegistry,
-      );
+      const b = new WorkflowBuilder<Config, [], Results>(this.name);
 
       b.guards = [...(this.guards ?? [])];
       b.frontier = parentFrontier;
@@ -333,27 +322,18 @@ export class WorkflowBuilder<
     return this as any as WorkflowBuilder<Config, Steps, Results>;
   }
 
-  subflow<Prefix extends string, K extends keyof Config["wfReg"] & string>(
+  subflow<Prefix extends string, SF extends WorkflowDef<any, any, any, any>>(
     prefix: Prefix,
-    workflowKey: K,
-    resolve?: (
-      ctx: ExprCtx<Config["services"], Results>,
-    ) => WorkflowInput<Config["wfReg"][K]>,
+    sf: SF,
+    resolve?: (ctx: ExprCtx<Config["services"], Results>) => WorkflowInput<SF>,
   ): WorkflowBuilder<
     Config,
     Steps,
-    Results & { [P in Prefix]: WorkflowOutput<Config["wfReg"][K]> },
+    Results & { [P in Prefix]: WorkflowOutput<SF> },
     Prefix
   > {
-    const subWf = this.wfRegistry?.[workflowKey] as WorkflowDef<
-      any,
-      any,
-      any,
-      any
-    >;
-
-    if (!subWf) {
-      throw new Error(`Subflow not found: ${workflowKey}`);
+    if (!sf) {
+      throw new Error(`Subflow not found`);
     }
 
     const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : null;
@@ -361,7 +341,7 @@ export class WorkflowBuilder<
     const ast = expr != null ? toExpr(expr) : null;
 
     const { wf, maxIdx, outputIdx } = remapWorkflowInstance(
-      subWf,
+      sf,
       ast,
       this.frontier,
       this.idx,
@@ -421,11 +401,7 @@ export class WorkflowBuilder<
 
     const newGuards = [...(this.guards ?? []), newGuardIdx];
 
-    const b = new WorkflowBuilder<Config, [], Results>(
-      this.name,
-
-      this.wfRegistry,
-    );
+    const b = new WorkflowBuilder<Config, [], Results>(this.name);
 
     b.frontier = [newGuardIdx];
     b.guards = [...newGuards];
@@ -480,7 +456,7 @@ export class WorkflowBuilder<
     this.validateDependencies();
 
     return {
-      _id: generateWorkflowId(this.name),
+      __id: generateWorkflowId(this.name),
       name: this.name,
 
       steps: this.steps as Steps,
@@ -518,15 +494,36 @@ export class WorkflowBuilder<
   }
 }
 
-export function createWorkflow<
-  WFReg extends Record<string, WorkflowDef<any, any, any, any>>,
-  Shared extends ServiceRegistry,
->(wfRegistry?: WFReg) {
+// export function createWorkflow<
+//   Shared extends ServiceRegistry,
+//   WFReg extends Record<string, WorkflowDef<any, any, any, any>>,
+// >(wfRegistry?: WFReg) {
+//   return function workflow<Input = unknown>(name: string) {
+//     return new WorkflowBuilder<WFConfig<Input, Shared, WFReg>>(
+//       name,
+//       wfRegistry,
+//     );
+//   };
+// }
+
+export function createWorkflow<Shared extends ServiceRegistry>() {
   return function workflow<Input = unknown>(name: string) {
-    return new WorkflowBuilder<WFConfig<Input, Shared, WFReg>>(
-      name,
-      wfRegistry,
-    );
+    return new WorkflowBuilder<WFConfig<Input, Shared>>(name);
   };
 }
+
+// export function createWorkflow<
+//   S extends ServiceRegistry,
+//   I extends IndexShape,
+//   A extends Record<string, string>,
+// >(access: {
+//   get<AKey extends keyof A, W extends keyof I[A[AKey]]>(
+//     alias: AKey,
+//     wf: W,
+//   ): I[A[AKey]][W];
+// }) {
+//   return function workflow<Input = unknown>(name: string) {
+//     return new WorkflowBuilder<WFConfig<Input, S, WFReg<I, A>>>(name, access);
+//   };
+// }
 export { StepDef, WorkflowDef };

@@ -1,267 +1,164 @@
-import { compileModule } from "./ast-compiler.js";
+import { compileModule, compileWorkflow } from "./ast-compiler.js";
 import { createExecutor } from "./executor.js";
-import { COMPILED_GRAPH, DEPS, EXEC_GRAPH, UNSET } from "./symbols.js";
+import { COMPILED_GRAPH, DEPS, MODULE_ID, UNSET } from "./symbols.js";
 import {
+  ExecutionPlan,
+  Module,
+  ModuleContext,
+  RuntimeOptions,
+  RuntimeServices,
   ServiceMetaRegistry,
   ServiceRegistry,
-  Simplify,
-  WorkflowDef,
   WorkflowInput,
-  WorkflowObserver,
   WorkflowOutput,
 } from "./types.js";
 
-import { createWorkflow } from "./workflow-composer.js";
+import { createWorkflow, WorkflowDef } from "./workflow-composer.js";
 
-type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
-  x: infer I,
-) => any
-  ? I
-  : never;
-
-export type EnsureWorkflowShape<T> = {
-  [K in keyof T]: T[K] extends WorkflowDef<any, any, any> ? T[K] : never;
-};
-
-export type DepWorkflows<Deps extends ModuleMap> = keyof Deps extends never
-  ? {}
-  : Simplify<
-      EnsureWorkflowShape<
-        UnionToIntersection<
-          {
-            [D in keyof Deps & string]: {
-              [K in keyof Deps[D]["__public"] &
-                string as `${D}.${K}`]: Deps[D]["__public"][K];
-            };
-          }[keyof Deps & string]
-        >
-      >
-    >;
-export type WorkflowRegistry<
-  Own extends ModuleShape,
-  Deps extends ModuleMap,
-> = Own & DepWorkflows<Deps>;
-
-export type AnyWorkflow = WorkflowDef<any, any, any, any>;
-export type ModuleShape = Record<string, AnyWorkflow>;
-export type ModuleMap = Record<string, Module<any, any, any, any>>;
-
-export type FinalServices<
-  S extends ServiceRegistry,
-  Deps extends ModuleMap,
-> = S & ServicesFromDeps<Deps>;
-
-// export type ServicesFromDeps<Deps extends ModuleMap> = UnionToIntersection<
-//   {
-//     [K in keyof Deps]: Deps[K] extends Module<any, infer S, any, any, any>
-//       ? S
-//       : never;
-//   }[keyof Deps]
-// >;
-type ExtractServices<M> = M extends Module<infer S, any, any, any> ? S : never;
-export type ServicesFromDeps<Deps extends ModuleMap> = {
-  [K in keyof Deps]: ExtractServices<Deps[K]>;
-}[keyof Deps] extends infer U
-  ? UnionToIntersection<U>
-  : never;
-
-export type ServicesFromDepsRecursive<Deps extends ModuleMap> = [
-  keyof Deps,
-] extends [never]
-  ? {} // no deps
-  : UnionToIntersection<
-      {
-        [K in keyof Deps]: Deps[K] extends Module<
-          infer S,
-          any,
-          infer SubDeps,
-          any
-        >
-          ? S & ServicesFromDepsRecursive<SubDeps>
-          : never;
-      }[keyof Deps]
-    >;
-
-// export type WorkflowInput<W> =
-//   W extends WorkflowDef<infer I, any, any, any> ? I : never;
-
-export type WorkflowResults<W> =
-  W extends WorkflowDef<any, infer R, any, any> ? R : never;
-
-// export type WorkflowOutput<W> =
-//   W extends WorkflowDef<any, any, any, infer O> ? O : never;
-
-export type ModuleContext<
-  WFReg extends Record<string, WorkflowDef<any, any, any, any>>,
-  S extends ServiceRegistry,
-> = {
-  wf: ReturnType<typeof createWorkflow<WFReg, S>>;
-};
-export type ExposedWorkflows<
-  Own extends ModuleShape,
-  Use extends ModuleMap,
-  Expose extends Record<string, keyof DepWorkflows<Use>> | undefined,
-> =
-  Expose extends Record<string, keyof DepWorkflows<Use>>
-    ? Own & {
-        [K in keyof Expose]: DepWorkflows<Use>[Expose[K]];
-      }
-    : Own; // ← When
-
-export type Module<
-  S extends ServiceRegistry,
-  Own extends ModuleShape,
-  Deps extends ModuleMap,
-  Public extends ModuleShape,
-> = {
-  workflows: Own;
-  __public: Public;
-  [DEPS]: ModuleMap;
-  [EXEC_GRAPH]: ModuleShape;
-};
+type Merge<A, B> = A & B;
 
 function createModule<
   S extends ServiceRegistry,
-  Use extends ModuleMap,
-  Own extends ModuleShape,
-  Expose extends Record<string, keyof DepWorkflows<Use>> | undefined,
+  Use extends Record<string, Module<any, any>>,
+  Own extends Record<string, WorkflowDef<any, any, any, any>>,
+  Expose extends Record<string, WorkflowDef<any, any, any, any>> = {},
 >(config: {
   use?: Use;
   expose?: Expose;
-  define: (ctx: ModuleContext<DepWorkflows<Use>, S>) => Own;
-}): Module<S, Own, Use, ExposedWorkflows<Own, Use, Expose> & ModuleShape> {
-  const deps = (config.use ?? {}) as Use;
 
-  type WFReg = DepWorkflows<Use>;
+  define: (ctx: ModuleContext<Use, S>) => Own;
+}): Module<S, Own & Expose> {
+  const deps = config.use ?? ({} as Use);
 
-  const depWFs = Object.fromEntries(
-    Object.entries(deps).flatMap(([name, mod]) =>
-      Object.entries(mod.__public).map(([k, wf]) => [`${name}.${k}`, wf]),
-    ),
-  );
-
-  const wf = createWorkflow<WFReg, S>(depWFs as any);
+  const wf = createWorkflow<S>();
 
   const own = config.define({
     wf,
+    deps,
   });
 
-  function mergePublic<
-    Own extends ModuleShape,
-    Use extends ModuleMap,
-    Expose extends Record<string, keyof DepWorkflows<Use>> | undefined,
-  >(
-    own: Own,
-    exposed: Record<string, AnyWorkflow>,
-  ): ExposedWorkflows<Own, Use, Expose> {
-    return { ...own, ...exposed } as any;
-  }
+  const module = Object.create(own);
 
-  function buildWorkflowMap() {
-    const depWFs = Object.fromEntries(
-      Object.entries(deps).flatMap(([name, mod]) =>
-        Object.entries(mod.__public).map(([k, wf]) => [`${name}.${k}`, wf]),
-      ),
-    );
-
-    const internalBase = { ...own, ...depWFs } as WorkflowRegistry<Own, Use>;
-
-    const exposed = {} as Record<string, AnyWorkflow>;
-
-    if (config.expose) {
-      for (const alias in config.expose) {
-        const key = config.expose[alias];
-        exposed[alias] = internalBase[key];
-      }
+  if (config.expose) {
+    for (const k in config.expose) {
+      Object.defineProperty(module, k, {
+        value: config.expose[k],
+        enumerable: true,
+      });
     }
-    const internal = {
-      ...internalBase,
-      ...exposed,
-    } as WorkflowRegistry<Own, Use> & typeof exposed;
-
-    const publicMap = mergePublic<Own, Use, Expose>(own, exposed);
-    return { internal, publicMap };
   }
-  const { internal, publicMap } = buildWorkflowMap();
+  return module as Module<S, Own & Expose>;
 
-  return {
-    workflows: own,
-    __public: publicMap,
-    [DEPS]: deps,
-    [EXEC_GRAPH]: internal,
-  } satisfies Module<
-    S,
-    Own,
-    Use,
-    ExposedWorkflows<Own, Use, Expose> & ModuleShape
-  >;
+  // return {
+  //   ...own,
+  //   ...(config.expose ?? {}),
+  // } as Merge<Own, Expose>;
 }
-
-export function createRuntimeRoot<M extends Module<any, any, any, any>>({
-  module,
-  services,
-  meta,
-}: {
-  module: M;
-  services: ModuleRuntimeServices<M>;
-  meta?: ServiceMetaRegistry<any>;
-}) {
-  const compiled = compileModule(module, services, meta);
-
-  return {
-    run: async <K extends keyof M["__public"]>(
-      workflowId: K,
-      input: WorkflowInput<M["__public"][K]>,
-      observers: WorkflowObserver[] = [],
-    ): Promise<{
-      output: WorkflowOutput<M["__public"][K]>;
-      extras: Record<string, any>;
-    }> => {
-      const plan = compiled[COMPILED_GRAPH][workflowId as string];
-
-      if (!plan) {
-        throw new Error(`Workflow not found: ${String(workflowId)}`);
-      }
-
-      const executor = createExecutor(plan, services, observers);
-
-      const results = new Array(plan.maxIndex + 1);
-      // results.fill(UNSET);
-
-      if (typeof plan.initIdx === "number") {
-        results[plan.initIdx] = input;
-      }
-
-      const output = await executor(results, {});
-      // const output = await executePlan(plan, input, results, observers);
-
-      return {
-        output,
-        extras: {},
-      };
-    },
-  };
-}
-
-export type ModuleServices<M> =
-  M extends Module<infer S, any, any, any> ? S : never;
-
-export type ModuleDeps<M> =
-  M extends Module<any, any, infer D, any> ? D : never;
-
-export type ModuleRuntimeServices<M extends Module<any, any, any, any>> =
-  FinalServices<ModuleServices<M>, ModuleDeps<M>>;
 
 export function createModuleFactory<S extends ServiceRegistry>() {
   return function <
-    Use extends ModuleMap = {},
-    Own extends ModuleShape = {},
-    Expose extends Record<string, keyof DepWorkflows<Use>> = {},
+    Use extends Record<string, Module<any, any>> = {},
+    Own extends Record<string, WorkflowDef<any, any, any, any>> = {},
+    Expose extends Record<string, WorkflowDef<any, any, any, any>> = {},
   >(config: {
     use?: Use;
     expose?: Expose;
-    define: (ctx: ModuleContext<DepWorkflows<Use>, S>) => Own;
-  }): Module<S, Own, Use, ExposedWorkflows<Own, Use, Expose>> {
+
+    define: (ctx: ModuleContext<Use, S>) => Own;
+  }): Module<S, Own & Expose> {
     return createModule<S, Use, Own, Expose>(config);
   };
+}
+
+export function createRuntimeRoot<MM extends Record<string, Module<any, any>>>({
+  modules,
+  services,
+  meta,
+  options,
+}: {
+  modules: MM;
+  services: RuntimeServices<MM>;
+  meta?: ServiceMetaRegistry<any>;
+  options?: RuntimeOptions<MM>;
+}) {
+  const compiledCache: Map<string, ExecutionPlan> = new Map();
+  console.log("cache bef", compiledCache);
+  return {
+    run: async <M extends keyof MM & string, K extends keyof MM[M] & string>(
+      modKey: M,
+      workflow: K,
+      input: WorkflowInput<MM[M][K]>,
+    ): Promise<{
+      output: WorkflowOutput<MM[M][K]>;
+      extras: Record<string, unknown>;
+    }> => {
+      const modId = modules[modKey][workflow].__id;
+
+      if (!compiledCache.has(modId)) {
+        compiledCache.set(
+          modId,
+          compileWorkflow(modules[modKey][workflow], { meta }),
+        );
+      }
+
+      const plan = compiledCache.get(modId);
+
+      if (!plan) {
+        throw new Error(`Compiled plan not found`);
+      } else {
+        const executor = createExecutor(
+          plan,
+          services as any,
+          options?.global?.observers ?? [],
+        );
+
+        const results = new Array(plan.maxIndex + 1);
+
+        if (typeof plan.initIdx === "number") {
+          results[plan.initIdx] = input;
+        }
+
+        const output = await executor(results, {});
+        console.dir(compiledCache, { depth: 16 });
+        return {
+          output,
+          extras: {},
+        };
+      }
+    },
+  };
+
+  // return {
+  //   run: async <K extends keyof M["__public"]>(
+  //     workflowId: K,
+  //     input: WorkflowInput<M["__public"][K]>,
+  //     observers: WorkflowObserver[] = [],
+  //   ): Promise<{
+  //     output: WorkflowOutput<M["__public"][K]>;
+  //     extras: Record<string, any>;
+  //   }> => {
+  //     const plan = compiled[COMPILED_GRAPH][workflowId as string];
+  //
+  //     if (!plan) {
+  //       throw new Error(`Workflow not found: ${String(workflowId)}`);
+  //     }
+  //
+  //     const executor = createExecutor(plan, services, observers);
+  //
+  //     const results = new Array(plan.maxIndex + 1);
+  //     // results.fill(UNSET);
+  //
+  //     if (typeof plan.initIdx === "number") {
+  //       results[plan.initIdx] = input;
+  //     }
+  //
+  //     const output = await executor(results, {});
+  //     // const output = await executePlan(plan, input, results, observers);
+  //
+  //     return {
+  //       output,
+  //       extras: {},
+  //     };
+  //   },
+  // };
 }

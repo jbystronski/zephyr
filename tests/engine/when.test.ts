@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 
-import { registryA } from "../utils";
 import { baseServices, StandardServices, useLog } from "../../src";
 
 import {
@@ -246,21 +245,24 @@ const mod = createModuleFactory<StandardServices>()({
   }),
 });
 
-const root = createRuntimeRoot({ module: mod, services: baseServices.build() });
+const root = createRuntimeRoot({
+  modules: { mod },
+  services: baseServices.build(),
+});
 
 describe("Workflow engine - linear execution with when", () => {
   it("should execute steps in correct order and skip / run steps conditionally", async () => {
-    const resA = await root.run("a", { input: 3 });
+    const resA = await root.run("mod", "a", { input: 3 });
     expect(resA.output).toEqual({ a: 12, b: 15, c: 18 });
   });
 
   it("should skip step3 when condition is false", async () => {
-    const resB = await root.run("b", { input: 3 });
+    const resB = await root.run("mod", "b", { input: 3 });
     expect(resB.output).toEqual({ a: 12, b: undefined, c: undefined, d: 12 });
   });
 
   it("should conditionally execute parallel branches", async () => {
-    const resC = await root.run("c", { input: 3 });
+    const resC = await root.run("mod", "c", { input: 3 });
     expect(resC.output).toEqual({
       base: 12,
       p0: 13,
@@ -270,7 +272,7 @@ describe("Workflow engine - linear execution with when", () => {
   });
 
   it("should skip all parallel branches when condition is false", async () => {
-    const resD = await root.run("d", { input: 3 });
+    const resD = await root.run("mod", "d", { input: 3 });
     expect(resD.output).toEqual({
       base: 12,
       p0: undefined,
@@ -282,7 +284,7 @@ describe("Workflow engine - linear execution with when", () => {
 
 describe("Workflow engine - parallel with independent when per branch", () => {
   it("should respect different when conditions per branch", async () => {
-    const resE = await root.run("e", { input: 3 });
+    const resE = await root.run("mod", "e", { input: 3 });
 
     expect(resE.output).toEqual({
       base: 12,
@@ -293,7 +295,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
   });
 
   it("should handle nested when inside parallel inside when", async () => {
-    const resG = await root.run("g", { input: 3 });
+    const resG = await root.run("mod", "g", { input: 3 });
     expect(resG.output).toEqual({
       base: 12,
       p0: 13,
@@ -303,7 +305,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
   });
 
   it("should handle join when all parallel branches are skipped", async () => {
-    const resH = await root.run("h", { input: 3 });
+    const resH = await root.run("mod", "h", { input: 3 });
     expect(resH.output).toEqual({
       base: 12,
       p0: undefined,
@@ -330,12 +332,12 @@ describe("Workflow engine - parallel with independent when per branch", () => {
 
     const parent = createMod({
       use: { child },
-      define: ({ wf }) => {
+      define: ({ wf, deps: { child } }) => {
         const test = wf("test")
           .if(
             "true equals false",
             (ctx) => ctx.logic.eq(true, false),
-            (b) => b.subflow("result", "child.sum", () => ({ a: 2, b: 3 })),
+            (b) => b.subflow("result", child.sum, () => ({ a: 2, b: 3 })),
           ) // ❌ skip subflow
 
           .output((ctx) => ctx.get("result"));
@@ -345,11 +347,11 @@ describe("Workflow engine - parallel with independent when per branch", () => {
     });
 
     const rt = createRuntimeRoot({
-      module: parent,
+      modules: { parent },
       services: baseServices.build(),
     });
 
-    const res = await rt.run("test", {}, []);
+    const res = await rt.run("parent", "test", {});
 
     expect(res.output).toBeUndefined();
     // expect(executed).toBe(false); // 🔥 critical assertion

@@ -3,7 +3,7 @@ import {
   createModuleFactory,
   createRuntimeRoot,
 } from "../../src/workflow-module";
-import { registryA } from "../utils";
+
 import { baseServices, eventStream, StandardServices, useLog } from "../../src";
 
 eventStream.subscribe((ev: any) => {
@@ -69,8 +69,8 @@ const modB = mod({
 
 const modA = mod({
   use: { modB },
-  expose: { findObject: "modB.findObject" },
-  define: ({ wf }) => ({
+  expose: { findObject: modB.findObject },
+  define: ({ wf, deps: { modB } }) => ({
     createObjects: wf<{ initData: { label: string; kind: string }[] }>(
       "create objects",
     )
@@ -82,7 +82,7 @@ const modA = mod({
         (b) =>
           b
             .init("item")
-            .sub("new object", "modB.createExplorerObject", ({ get }) => ({
+            .sub("new object", modB.createExplorerObject, ({ get }) => ({
               key: get("item").label,
             })),
       )
@@ -95,7 +95,7 @@ const modA = mod({
 
 const modC = mod({
   use: { modA },
-  define: ({ wf }) => ({
+  define: ({ wf, deps: { modA } }) => ({
     accessChained: wf<{ nestedObject: { foo: { bar: string } } }>(
       "access chain",
     )
@@ -108,11 +108,11 @@ const modC = mod({
       initData: { label: string; kind: string }[];
     }>("create object and find by key")
       .init("i")
-      .sub("created objects", "modA.createObjects", ({ get }) => ({
+      .sub("created objects", modA.createObjects, ({ get }) => ({
         initData: get("i").initData,
       }))
 
-      .sub("find", "modA.findObject", ({ get }) => ({
+      .sub("find", modA.findObject, ({ get }) => ({
         data: get("created objects").objects,
         key: get("i").keyToFind,
       }))
@@ -120,23 +120,23 @@ const modC = mod({
   }),
 });
 
-console.dir(modC.__public.accessChained, { depth: 16 });
+console.dir(modC.accessChained, { depth: 16 });
 
 const services = baseServices.build();
 
 const modAruntime = createRuntimeRoot({
-  module: modA,
+  modules: { modA },
   services,
 });
 
 const modCruntime = createRuntimeRoot({
-  module: modC,
+  modules: { modC },
   services,
 });
 
 describe("Various tests", () => {
   it("should correctly return objects array created from piped subflow", async () => {
-    const testOne = await modAruntime.run("createObjects", {
+    const testOne = await modAruntime.run("modA", "createObjects", {
       initData: [
         { kind: "bucket", label: "emails" },
         { kind: "bucket", label: "configs" },
@@ -166,29 +166,21 @@ describe("Various tests", () => {
   });
 
   it("should access AST value chained on call expression resolution", async () => {
-    const testChained = await modCruntime.run(
-      "accessChained",
-      {
-        nestedObject: { foo: { bar: "BAZ" } },
-      },
-      [],
-    );
+    const testChained = await modCruntime.run("modC", "accessChained", {
+      nestedObject: { foo: { bar: "BAZ" } },
+    });
 
     expect(testChained.output).toBe("BAZ");
   });
 
   it("should correctly return find explorer object if key exists", async () => {
-    const testTwo = await modCruntime.run(
-      "createObjectsAndFind",
-      {
-        initData: [
-          { kind: "bucket", label: "emails" },
-          { kind: "bucket", label: "configs" },
-        ],
-        keyToFind: "emails",
-      },
-      [useLog()],
-    );
+    const testTwo = await modCruntime.run("modC", "createObjectsAndFind", {
+      initData: [
+        { kind: "bucket", label: "emails" },
+        { kind: "bucket", label: "configs" },
+      ],
+      keyToFind: "emails",
+    });
 
     expect(testTwo.output.found).toEqual({
       label: "emails",

@@ -3,7 +3,7 @@ import {
   createModuleFactory,
   createRuntimeRoot,
 } from "../../src/workflow-module";
-import { registryA } from "../utils";
+
 import { useLog } from "../../src";
 
 describe("Retry handling at action level", () => {
@@ -48,7 +48,7 @@ describe("Retry handling at action level", () => {
     // Parent workflow
     const parent = createMod({
       use: { child },
-      define: ({ wf }) => {
+      define: ({ wf, deps: { child } }) => {
         const test = wf<{ x: number; y: number }>("test")
           .init("test_init")
           .seq(
@@ -58,7 +58,7 @@ describe("Retry handling at action level", () => {
               ctx.actions.add(ctx.get("test_init").x, ctx.get("test_init").y),
             { retry: 3 }, // retry on the parent action
           )
-          .subflow("b", "child.failStep", (ctx) => ({
+          .subflow("b", child.failStep, (ctx) => ({
             a: ctx.get("a"),
             b: 10,
           }))
@@ -68,9 +68,12 @@ describe("Retry handling at action level", () => {
       },
     });
 
-    const r0 = createRuntimeRoot({ module: parent, services: { actions } });
+    const r0 = createRuntimeRoot({
+      modules: { parent },
+      services: { actions },
+    });
 
-    const res = await r0.run("test", { x: 1, y: 2 }, []);
+    const res = await r0.run("parent", "test", { x: 1, y: 2 });
 
     // ✅ Verify retry counts
     expect(retriesA).toBe(2); // retried once

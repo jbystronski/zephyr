@@ -7,6 +7,7 @@ import {
   ExecutionPlan,
   PipeMode,
   ResultsArray,
+  RuntimeServices,
   StepRuntimeCtx,
   WorkflowObserver,
 } from "./types.js";
@@ -19,6 +20,17 @@ export function createExecutor(
   if (observers.length === 0) return createFastExecutor(plan, services);
   return createObservedExecutor(plan, services, observers);
 }
+
+// TODO: add await to normalize Promise maybe value
+//
+// const value = await executeStep(step, rt);
+// results[step.idx] = await Promise.resolve(value);
+//
+// AND in observed
+//
+// const value = await executeStep(step, rt);
+// frame.value = await Promise.resolve(value);
+// results[step.idx] = value;
 
 function createFastExecutor(
   plan: ExecutionPlan,

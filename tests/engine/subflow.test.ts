@@ -5,43 +5,45 @@ import {
   createModuleFactory,
   createRuntimeRoot,
 } from "../../src/workflow-module";
-import { registryA } from "../utils";
-import { useLog } from "../../src";
+
+import { baseServices, createMeta, StandardServices, useLog } from "../../src";
 
 type PayService = {
-  actions: (typeof registryA)["actions"];
   stripe: {
-    charge(amount: number): Promise<number>;
+    charge(amount: number): Promise<{ amount: number; paid: boolean }>;
   };
 };
 
-const createMod = createModuleFactory<PayService>();
-const deepChildSecond = createMod({
+const mod = createModuleFactory<
+  StandardServices & { stripe: PayService["stripe"] }
+>();
+
+const deepChildSecond = mod({
   define: ({ wf }) => ({
     deepChildActionSecond: wf<{ init: string }>("deepChildActionSecond")
       .init("init")
-      .seq("actionSecond", (ctx) => ctx.actions.uppercase(ctx.get("init").init))
+      .seq("actionSecond", (ctx) => ctx.string.upper(ctx.get("init").init))
       .output((ctx) => ({ deepRes: ctx.get("actionSecond") })),
   }),
 });
 
-const deepChild = createMod({
+const deepChild = mod({
   define: ({ wf }) => ({
     deepChildAction: wf<{ init: string }>("deepChildAction")
       .init("d2_init")
-      .seq("action", (ctx) => ctx.actions.uppercase(ctx.get("d2_init").init))
+      .seq("action", (ctx) => ctx.string.upper(ctx.get("d2_init").init))
       .output((ctx) => ({ deepRes: ctx.get("action") })),
   }),
 });
 
-const child = createMod({
+const child = mod({
   use: { deepChild, second: deepChildSecond },
-  expose: { deepAction: "deepChild.deepChildAction" },
+  expose: { deepAction: deepChild.deepChildAction },
   define: ({ wf }) => ({
     sum: wf<{ a: number; b: number }>("sum")
       .init("d3_init")
       .seq("add", (ctx) =>
-        ctx.actions.add(ctx.get("d3_init").a, ctx.get("d3_init").b),
+        ctx.math.add(ctx.get("d3_init").a, ctx.get("d3_init").b),
       )
       .seq("payment", (ctx) => ctx.stripe.charge(444))
 
@@ -51,34 +53,33 @@ const child = createMod({
 
 // type T = DepWorkflows<{ child: typeof child }>;
 
-const parent = createMod({
+const parent = mod({
   use: { child },
-  expose: { sub: "child.sum" },
-  define: ({ wf }) => {
+  expose: { sub: child.sum },
+  define: ({ wf, deps: { child } }) => {
     const test = wf("test")
-      .subflow("deepAction", "child.deepAction", () => ({ init: "abc" }))
-      .sub("result", "child.sum", () => ({ a: 2, b: 3 }))
+      .subflow("deepAction", child.deepAction, () => ({ init: "abc" }))
+      .sub("result", child.sum, () => ({ a: 2, b: 3 }))
       .output((ctx) => ctx.get("result"));
 
     return { test };
   },
 });
+const s = baseServices
+  .add("stripe", {
+    charge: async (amount: number) => ({ paid: true, amount }),
+  })
+  .build();
 
 describe("Subflow", () => {
   it("should execute subflow and return result", async () => {
     const root = createRuntimeRoot({
-      module: parent,
-      services: {
-        ...registryA,
-        stripe: {
-          async charge(amount: number) {
-            return amount;
-          },
-        },
-      },
+      modules: { parent },
+      services: s,
+      meta: createMeta().service("stripe", { async: true }).build(),
     });
 
-    const res = await root.run("test", {}, [useLog()]);
+    const res = await root.run("parent", "test", {});
 
     // const childRes = childRt.run("sum")
     expect(res.output).toBe(5);

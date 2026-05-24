@@ -10,50 +10,26 @@ import {
   stdLib,
   stringLib,
 } from "./services.js";
-import { ServiceMeta, ServiceMetaRegistry, ServiceMetaRule } from "./types.js";
-import { Module } from "./workflow-module.js";
+import {
+  Module,
+  ServiceMeta,
+  ServiceMetaRegistry,
+  ServiceMetaRule,
+} from "./types.js";
+
 let idCounter = 0;
 
 export function generateWorkflowId(name: string) {
   const id = (idCounter++).toString(36);
   return name ? `${name}-${id}` : id;
 }
+
+export const uniqueId = () => generateWorkflowId("");
 // export function generateWorkflowId(name: string) {
 //   const random = Math.random().toString(36).slice(2, 12);
 //
 //   return name ? `${name}-${random}` : random;
 // }
-
-export function exposeAll<
-  Name extends string,
-  M extends Module<any, any, any, any>,
->(name: Name, mod: M) {
-  type Keys = keyof M["workflows"] & string;
-
-  const result = {} as Record<`${Name}.${Keys}`, `${Name}.${Keys}`>;
-
-  for (const key in mod.workflows) {
-    const full = `${name}.${key}` as `${Name}.${Keys}`;
-    result[full] = full;
-  }
-
-  return result;
-}
-
-export function exposeAllAs<
-  Name extends string,
-  M extends Module<any, any, any, any>,
->(name: Name, mod: M) {
-  type Keys = keyof M["workflows"] & string;
-
-  const result = {} as Record<Keys, `${Name}.${Keys}`>;
-
-  for (const key in mod.workflows) {
-    result[key as Keys] = `${name}.${key}` as `${Name}.${Keys}`;
-  }
-
-  return result;
-}
 
 export function createAliasResolver(results: any, aliasMap: any) {
   return (id: string) => {
