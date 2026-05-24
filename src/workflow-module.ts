@@ -4,7 +4,6 @@ import { COMPILED_GRAPH, DEPS, MODULE_ID, UNSET } from "./symbols.js";
 import {
   ExecutionPlan,
   Module,
-  ModuleContext,
   RuntimeOptions,
   RuntimeServices,
   ServiceMetaRegistry,
@@ -15,58 +14,13 @@ import {
 
 import { createWorkflow, WorkflowDef } from "./workflow-composer.js";
 
-type Merge<A, B> = A & B;
-
-function createModule<
-  S extends ServiceRegistry,
-  Use extends Record<string, Module<any, any>>,
-  Own extends Record<string, WorkflowDef<any, any, any, any>>,
-  Expose extends Record<string, WorkflowDef<any, any, any, any>> = {},
->(config: {
-  use?: Use;
-  expose?: Expose;
-
-  define: (ctx: ModuleContext<Use, S>) => Own;
-}): Module<S, Own & Expose> {
-  const deps = config.use ?? ({} as Use);
-
+export function createModule<S extends ServiceRegistry>() {
   const wf = createWorkflow<S>();
 
-  const own = config.define({
-    wf,
-    deps,
-  });
-
-  const module = Object.create(own);
-
-  if (config.expose) {
-    for (const k in config.expose) {
-      Object.defineProperty(module, k, {
-        value: config.expose[k],
-        enumerable: true,
-      });
-    }
-  }
-  return module as Module<S, Own & Expose>;
-
-  // return {
-  //   ...own,
-  //   ...(config.expose ?? {}),
-  // } as Merge<Own, Expose>;
-}
-
-export function createModuleFactory<S extends ServiceRegistry>() {
-  return function <
-    Use extends Record<string, Module<any, any>> = {},
-    Own extends Record<string, WorkflowDef<any, any, any, any>> = {},
-    Expose extends Record<string, WorkflowDef<any, any, any, any>> = {},
-  >(config: {
-    use?: Use;
-    expose?: Expose;
-
-    define: (ctx: ModuleContext<Use, S>) => Own;
-  }): Module<S, Own & Expose> {
-    return createModule<S, Use, Own, Expose>(config);
+  return function <WFs extends Record<string, WorkflowDef<any, any>>>(
+    define: (ctx: { wf: ReturnType<typeof createWorkflow<S>> }) => WFs,
+  ): Module<S, WFs> {
+    return define({ wf }) as Module<S, WFs>;
   };
 }
 

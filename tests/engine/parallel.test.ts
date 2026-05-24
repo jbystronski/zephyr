@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { createModuleFactory, createRuntimeRoot } from "../../src";
+import { createModule, createRuntimeRoot } from "../../src";
 
 const calls: string[] = [];
 
@@ -19,18 +19,16 @@ describe("Parallel execution", () => {
   it("should execute all branches", async () => {
     calls.length = 0;
 
-    const mod = createModuleFactory<typeof local>()({
-      define: ({ wf }) => ({
-        test: wf("parllel-test")
-          .parallel(
-            (b) => b.seq("a", (_) => _.actions.a()),
-            (b) => b.seq("b", (_) => _.actions.b()),
-            (b) => b.seq("c", (_) => _.actions.c()),
-          )
-          .join()
-          .build(),
-      }),
-    });
+    const mod = createModule<typeof local>()(({ wf }) => ({
+      test: wf("parllel-test")
+        .parallel(
+          (b) => b.seq("a", (_) => _.actions.a()),
+          (b) => b.seq("b", (_) => _.actions.b()),
+          (b) => b.seq("c", (_) => _.actions.c()),
+        )
+        .join()
+        .build(),
+    }));
 
     const rt = createRuntimeRoot({ modules: { mod }, services: { ...local } });
     await rt.run("mod", "test", {});

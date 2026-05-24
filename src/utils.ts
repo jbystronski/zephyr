@@ -10,12 +10,7 @@ import {
   stdLib,
   stringLib,
 } from "./services.js";
-import {
-  Module,
-  ServiceMeta,
-  ServiceMetaRegistry,
-  ServiceMetaRule,
-} from "./types.js";
+import { ServiceMeta, ServiceMetaRegistry, ServiceMetaRule } from "./types.js";
 
 let idCounter = 0;
 

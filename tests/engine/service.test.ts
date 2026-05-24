@@ -1,10 +1,7 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import {
-  createModuleFactory,
-  createRuntimeRoot,
-} from "../../src/workflow-module";
+import { createModule, createRuntimeRoot } from "../../src/workflow-module";
 
 import { StandardServices, useLog } from "../../src";
 import { baseServices, createMeta } from "../../src/utils";
@@ -14,66 +11,49 @@ type PayService = {
   };
 };
 
-const mod = createModuleFactory<
-  StandardServices & { stripe: PayService["stripe"] }
->();
+const mod = createModule<StandardServices & { stripe: PayService["stripe"] }>();
 
-const subchild = mod({
-  define: ({ wf }) => ({
-    loc: wf("loc")
-      .seq("a", (ctx) => ctx.math.add(2, 2))
-      .output((ctx) => ctx.get("a")),
-  }),
+const subchild = mod(({ wf }) => ({
+  loc: wf("loc")
+    .seq("a", (ctx) => ctx.math.add(2, 2))
+    .output((ctx) => ctx.get("a")),
+}));
+
+const child = mod(({ wf }) => {
+  const pay = wf<{ amount: number }>("payment")
+    .init("pay_init")
+    .seq("payment", (ctx) => ctx.stripe.charge(ctx.get("pay_init").amount))
+
+    .output((ctx) => ctx.get("payment"));
+
+  return { pay };
 });
 
-const child = mod({
-  use: {},
-  define: ({ wf }) => {
-    const pay = wf<{ amount: number }>("payment")
-      .init("pay_init")
-      .seq("payment", (ctx) => ctx.stripe.charge(ctx.get("pay_init").amount))
+const local = mod(({ wf }) => ({
+  st: wf("st")
+    .seq("st", (ctx) => ctx.stripe.charge(333))
+    .build(),
+  localOne: wf<{ input: boolean }>("macro_1")
+    .seq("add", (ctx) => ctx.math.add(2, 3))
+    .output((ctx) => ctx.get("add")),
+  localTwo: wf("macro_2")
+    // .init("i")
+    .seq("adding 2 and 3", (ctx) => ctx.math.add(2, 3))
+    .output((ctx) => ctx.get("adding 2 and 3")),
+}));
 
-      .output((ctx) => ctx.get("payment"));
+const parent = mod(({ wf }) => {
+  const test = wf("test")
+    .init("i")
+    .subflow("macro", local.localTwo, () => ({}))
+    .subflow("result", child.pay, () => ({
+      amount: 400,
+    }))
 
-    return { pay };
-  },
-});
+    .seq("sum_2_test", (ctx) => ctx.math.add(ctx.math.add(2, 3), 10))
+    .output((ctx) => ctx.get("result"));
 
-const local = mod({
-  use: { child },
-  define: ({ wf }) => ({
-    st: wf("st")
-      .seq("st", (ctx) => ctx.stripe.charge(333))
-      .build(),
-    localOne: wf<{ input: boolean }>("macro_1")
-      .seq("add", (ctx) => ctx.math.add(2, 3))
-      .output((ctx) => ctx.get("add")),
-    localTwo: wf("macro_2")
-      // .init("i")
-      .seq("adding 2 and 3", (ctx) => ctx.math.add(2, 3))
-      .output((ctx) => ctx.get("adding 2 and 3")),
-  }),
-});
-
-const parent = mod({
-  use: {
-    child,
-    local,
-  },
-  expose: { macroOne: local.localOne },
-  define: ({ wf, deps: { child } }) => {
-    const test = wf("test")
-      .init("i")
-      .subflow("macro", local.localTwo, () => ({}))
-      .subflow("result", child.pay, () => ({
-        amount: 400,
-      }))
-
-      .seq("sum_2_test", (ctx) => ctx.math.add(ctx.math.add(2, 3), 10))
-      .output((ctx) => ctx.get("result"));
-
-    return { test };
-  },
+  return { test, macroOne: local.localOne };
 });
 
 const s = baseServices

@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  createModuleFactory,
-  createRuntimeRoot,
-} from "../../src/workflow-module";
+import { createModule, createRuntimeRoot } from "../../src/workflow-module";
 
 import { baseServices, eventStream, StandardServices, useLog } from "../../src";
 
@@ -20,105 +17,95 @@ type ExplorerObject = {
   };
 };
 
-const mod = createModuleFactory<StandardServices>();
+const mod = createModule<StandardServices>();
 
-const modB = mod({
-  define: ({ wf }) => ({
-    createExplorerObject: wf<{ key: string; parent?: ExplorerObject }>(
-      "create explorer object",
+const modB = mod(({ wf }) => ({
+  createExplorerObject: wf<{ key: string; parent?: ExplorerObject }>(
+    "create explorer object",
+  )
+    .init("i")
+    .seq("type of object", ({ std, get }) =>
+      std.if(get("i").parent, "branch", "root"),
     )
-      .init("i")
-      .seq("type of object", ({ std, get }) =>
-        std.if(get("i").parent, "branch", "root"),
-      )
-      .seq("created", ({ std, get }) =>
-        std.const({
-          label: get("i").key,
-          parent: get("i").parent,
-          type: get("type of object"),
-          raw: {
-            name: get("i").key,
-            kind: "bucket",
-          },
-        }),
-      )
-      .as<ExplorerObject>()
-      .output(({ get }) => get("created")),
-
-    findObject: wf<{ data: ExplorerObject[]; key: string }>("find obejct")
-      .init("i")
-      .if(
-        "has key",
-        ({ logic: { truthy }, get }) => truthy(get("i").key),
-        (b) =>
-          b.pipe(
-            "find pipe",
-            "find",
-            ({ get }) => get("i").data,
-            (b) =>
-              b
-                .init("item")
-                .seq("match label", ({ get, logic: { eq } }) =>
-                  eq(get("i").key, get("item").label),
-                ),
-          ),
-      )
-      .output(({ get }) => ({ found: get("find pipe") })),
-  }),
-});
-
-const modA = mod({
-  use: { modB },
-  expose: { findObject: modB.findObject },
-  define: ({ wf, deps: { modB } }) => ({
-    createObjects: wf<{ initData: { label: string; kind: string }[] }>(
-      "create objects",
+    .seq("created", ({ std, get }) =>
+      std.const({
+        label: get("i").key,
+        parent: get("i").parent,
+        type: get("type of object"),
+        raw: {
+          name: get("i").key,
+          kind: "bucket",
+        },
+      }),
     )
-      .init("i")
-      .pipe(
-        "p 1",
-        "map",
-        ({ get }) => get("i").initData,
-        (b) =>
-          b
-            .init("item")
-            .sub("new object", modB.createExplorerObject, ({ get }) => ({
-              key: get("item").label,
-            })),
-      )
-      .as<ExplorerObject[]>()
-      .output(({ get }) => ({
-        objects: get("p 1"),
-      })),
-  }),
-});
+    .as<ExplorerObject>()
+    .output(({ get }) => get("created")),
 
-const modC = mod({
-  use: { modA },
-  define: ({ wf, deps: { modA } }) => ({
-    accessChained: wf<{ nestedObject: { foo: { bar: string } } }>(
-      "access chain",
+  findObject: wf<{ data: ExplorerObject[]; key: string }>("find obejct")
+    .init("i")
+    .if(
+      "has key",
+      ({ logic: { truthy }, get }) => truthy(get("i").key),
+      (b) =>
+        b.pipe(
+          "find pipe",
+          "find",
+          ({ get }) => get("i").data,
+          (b) =>
+            b
+              .init("item")
+              .seq("match label", ({ get, logic: { eq } }) =>
+                eq(get("i").key, get("item").label),
+              ),
+        ),
     )
-      .init("i")
-      .seq("extract", (_) => _.object.get(_.get("i").nestedObject, "foo").bar)
-      .output((_) => _.get("extract")),
+    .output(({ get }) => ({ found: get("find pipe") })),
+}));
 
-    createObjectsAndFind: wf<{
-      keyToFind: string;
-      initData: { label: string; kind: string }[];
-    }>("create object and find by key")
-      .init("i")
-      .sub("created objects", modA.createObjects, ({ get }) => ({
-        initData: get("i").initData,
-      }))
+const modA = mod(({ wf }) => ({
+  createObjects: wf<{ initData: { label: string; kind: string }[] }>(
+    "create objects",
+  )
+    .init("i")
+    .pipe(
+      "p 1",
+      "map",
+      ({ get }) => get("i").initData,
+      (b) =>
+        b
+          .init("item")
+          .sub("new object", modB.createExplorerObject, ({ get }) => ({
+            key: get("item").label,
+          })),
+    )
+    .as<ExplorerObject[]>()
+    .output(({ get }) => ({
+      objects: get("p 1"),
+    })),
+  findObject: modB.findObject,
+}));
 
-      .sub("find", modA.findObject, ({ get }) => ({
-        data: get("created objects").objects,
-        key: get("i").keyToFind,
-      }))
-      .output(({ get }) => ({ found: get("find").found })),
-  }),
-});
+const modC = mod(({ wf }) => ({
+  accessChained: wf<{ nestedObject: { foo: { bar: string } } }>("access chain")
+    .init("i")
+    .seq("extract", (_) => _.object.get(_.get("i").nestedObject, "foo").bar)
+    .output((_) => _.get("extract")),
+
+  createObjectsAndFind: wf<{
+    keyToFind: string;
+    initData: { label: string; kind: string }[];
+  }>("create object and find by key")
+    .init("i")
+    .sub("created objects", modA.createObjects, ({ get }) => ({
+      initData: get("i").initData,
+    }))
+
+    .sub("find", modA.findObject, ({ get }) => ({
+      data: get("created objects").objects,
+      key: get("i").keyToFind,
+    }))
+    .output(({ get }) => ({ found: get("find").found })),
+}));
 
 console.dir(modC.accessChained, { depth: 16 });
 

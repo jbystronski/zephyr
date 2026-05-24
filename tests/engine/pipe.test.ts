@@ -1,10 +1,7 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import {
-  createModuleFactory,
-  createRuntimeRoot,
-} from "../../src/workflow-module";
+import { createModule, createRuntimeRoot } from "../../src/workflow-module";
 
 import { baseServices, StandardServices, useLog } from "../../src";
 type S1 = {
@@ -61,115 +58,111 @@ const transformables: Transformable[] = [
   },
 ];
 
-const createMod = createModuleFactory<
+const createMod = createModule<
   StandardServices & {
     s1: S1;
   }
 >();
 
-const testPipe = createMod({
-  define: ({ wf }) => {
-    const findFirstArcticBird = wf<{ data: Transformable[] }>(
-      "firstArcticBirdTest",
+const testPipe = createMod(({ wf }) => {
+  const findFirstArcticBird = wf<{ data: Transformable[] }>(
+    "firstArcticBirdTest",
+  )
+    .init("i")
+    .pipe(
+      "firstArctictBird",
+      "find",
+      ({ get }) => get("i").data,
+      (b) =>
+        b
+          .init("animal")
+          .seq("first", ({ get, logic: { and, eq } }) =>
+            and(
+              eq(get("animal").kind, "bird"),
+              eq(get("animal").climate, "arctic"),
+            ),
+          ),
     )
-      .init("i")
-      .pipe(
-        "firstArctictBird",
-        "find",
-        ({ get }) => get("i").data,
-        (b) =>
-          b
-            .init("animal")
-            .seq("first", ({ get, logic: { and, eq } }) =>
-              and(
-                eq(get("animal").kind, "bird"),
-                eq(get("animal").climate, "arctic"),
-              ),
-            ),
-      )
-      .output(({ get }) => get("firstArctictBird"));
+    .output(({ get }) => get("firstArctictBird"));
 
-    const someAreTropical = wf<{ data: Transformable[] }>("someAreTropical")
-      .init("i")
-      .pipe(
-        "someAreTropical",
-        "some",
-        ({ get }) => get("i").data,
-        (b) =>
-          b
-            .init("animal")
-            .seq("first", ({ get, logic: { and, eq } }) =>
-              and(eq(get("animal").climate, "tropical")),
-            ),
-      )
-      .output(({ get }) => get("someAreTropical"));
+  const someAreTropical = wf<{ data: Transformable[] }>("someAreTropical")
+    .init("i")
+    .pipe(
+      "someAreTropical",
+      "some",
+      ({ get }) => get("i").data,
+      (b) =>
+        b
+          .init("animal")
+          .seq("first", ({ get, logic: { and, eq } }) =>
+            and(eq(get("animal").climate, "tropical")),
+          ),
+    )
+    .output(({ get }) => get("someAreTropical"));
 
-    const everyIsArctic = wf<{ data: Transformable[] }>("everyIsArctic")
-      .init("i")
-      .pipe(
-        "everyIsArctic",
-        "every",
-        ({ get }) => get("i").data,
-        (b) =>
-          b
-            .init("animal")
-            .seq("first", ({ get, logic: { and, eq } }) =>
-              and(eq(get("animal").climate, "arctic")),
-            ),
-      )
-      .output(({ get }) => get("everyIsArctic"));
+  const everyIsArctic = wf<{ data: Transformable[] }>("everyIsArctic")
+    .init("i")
+    .pipe(
+      "everyIsArctic",
+      "every",
+      ({ get }) => get("i").data,
+      (b) =>
+        b
+          .init("animal")
+          .seq("first", ({ get, logic: { and, eq } }) =>
+            and(eq(get("animal").climate, "arctic")),
+          ),
+    )
+    .output(({ get }) => get("everyIsArctic"));
 
-    const reptilesOnly = wf<{ data: Transformable[] }>("reptilesOnly")
-      .init("i")
-      .pipe(
-        "reptilesOnly",
-        "filter",
-        ({ get }) => get("i").data,
-        (b) =>
-          b
-            .init("animal")
-            .seq("first", ({ get, logic: { and, eq } }) =>
-              and(eq(get("animal").kind, "reptile")),
-            ),
-      )
-      .output(({ get }) => get("reptilesOnly"));
+  const reptilesOnly = wf<{ data: Transformable[] }>("reptilesOnly")
+    .init("i")
+    .pipe(
+      "reptilesOnly",
+      "filter",
+      ({ get }) => get("i").data,
+      (b) =>
+        b
+          .init("animal")
+          .seq("first", ({ get, logic: { and, eq } }) =>
+            and(eq(get("animal").kind, "reptile")),
+          ),
+    )
+    .output(({ get }) => get("reptilesOnly"));
 
-    const test = wf<{ elements: string[]; another: string }>("pipeElements")
-      .init("init")
-      .seq("add_animal", (_) =>
-        _.s1.addAnimal({
-          initArray: _.get("init").elements,
-          newAnimal: _.get("init").another,
-        }),
-      )
+  const test = wf<{ elements: string[]; another: string }>("pipeElements")
+    .init("init")
+    .seq("add_animal", (_) =>
+      _.s1.addAnimal({
+        initArray: _.get("init").elements,
+        newAnimal: _.get("init").another,
+      }),
+    )
 
-      .pipe(
-        "pv2",
-        "map",
-        ({ get }) => get("add_animal"),
-        (b) =>
-          b
-            .init("pv2_init")
-            .seq("upp", (ctx) => ctx.string.upper(ctx.get("pv2_init")))
-            .seq("pref", ({ std: { concat }, get }) => concat("<", get("upp")))
-            .seq("suffix", ({ std: { concat }, get }) =>
-              concat(get("pref"), ">"),
-            )
-            .seq("enrich", ({ std: { concat }, get }) =>
-              concat(get("suffix"), "!"),
-            ),
-      )
+    .pipe(
+      "pv2",
+      "map",
+      ({ get }) => get("add_animal"),
+      (b) =>
+        b
+          .init("pv2_init")
+          .seq("upp", (ctx) => ctx.string.upper(ctx.get("pv2_init")))
+          .seq("pref", ({ std: { concat }, get }) => concat("<", get("upp")))
+          .seq("suffix", ({ std: { concat }, get }) => concat(get("pref"), ">"))
+          .seq("enrich", ({ std: { concat }, get }) =>
+            concat(get("suffix"), "!"),
+          ),
+    )
 
-      .output(({ get }) => get("pv2"));
+    .output(({ get }) => get("pv2"));
 
-    return {
-      test,
-      findFirstArcticBird,
-      someAreTropical,
-      everyIsArctic,
-      reptilesOnly,
-    };
-  },
+  return {
+    test,
+    findFirstArcticBird,
+    someAreTropical,
+    everyIsArctic,
+    reptilesOnly,
+  };
 });
 
 const s = baseServices

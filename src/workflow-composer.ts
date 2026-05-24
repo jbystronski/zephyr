@@ -51,14 +51,22 @@ export class WorkflowBuilder<
 > {
   private steps: StepDef<any>[] = [];
   private guards: number[] = [];
+  private __id = generateWorkflowId(this.name);
 
   private frontier: number[] = [];
   private idToIdx: Record<string, number> = {};
   private idx = 0;
   private initIdx?: number | undefined = undefined;
   private outputIdx?: number;
+  private inlineStack: string[] = [];
 
-  constructor(private name: string) {}
+  constructor(private name: string) {
+    this.inlineStack.push(this.__id);
+  }
+
+  get id() {
+    return this.__id;
+  }
 
   init<ID extends string>(id: ID) {
     if (this.initIdx && this.initIdx > 0) {
@@ -199,7 +207,7 @@ export class WorkflowBuilder<
 
     const pipeInputAst = pipeExpr != null ? toExpr(pipeExpr) : null;
 
-    const subWf: WorkflowDef<any, any, any, any> = {
+    const subWf: WorkflowDef<any, any> = {
       __id: wfId,
       guards: built.guards,
 
@@ -322,7 +330,7 @@ export class WorkflowBuilder<
     return this as any as WorkflowBuilder<Config, Steps, Results>;
   }
 
-  subflow<Prefix extends string, SF extends WorkflowDef<any, any, any, any>>(
+  subflow<Prefix extends string, SF extends WorkflowDef<any, any>>(
     prefix: Prefix,
     sf: SF,
     resolve?: (ctx: ExprCtx<Config["services"], Results>) => WorkflowInput<SF>,
@@ -335,6 +343,22 @@ export class WorkflowBuilder<
     if (!sf) {
       throw new Error(`Subflow not found`);
     }
+
+    const targetId = (sf as any).__id;
+
+    if (!targetId) {
+      throw new Error("Invalid subflow: missing id");
+    }
+
+    // ❗ CYCLE CHECK
+    if (this.inlineStack.includes(targetId)) {
+      throw new Error(
+        `Cycle detected: ${this.inlineStack.join(" -> ")} -> ${targetId}`,
+      );
+    }
+
+    this.inlineStack.push(targetId);
+    this.inlineStack = [...new Set(this.inlineStack)];
 
     const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : null;
 
@@ -425,7 +449,7 @@ export class WorkflowBuilder<
 
   output<R>(
     resolve: (ctx: ExprCtx<Config["services"], Results>) => R,
-  ): WorkflowDef<Config["input"], Results, Steps, R> {
+  ): WorkflowDef<Config["input"], R> {
     const id = `${this.name}_out`;
     this.idToIdx[id] = this.idx;
     // const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : [];
@@ -449,14 +473,14 @@ export class WorkflowBuilder<
 
     this.idx += 1;
 
-    return this.build() as WorkflowDef<Config["input"], Results, Steps, Output>;
+    return this.build() as WorkflowDef<Config["input"], Output>;
   }
 
-  build(): WorkflowDef<Config["input"], Results, Steps> {
+  build(): WorkflowDef<Config["input"]> {
     this.validateDependencies();
 
     return {
-      __id: generateWorkflowId(this.name),
+      __id: this.id,
       name: this.name,
 
       steps: this.steps as Steps,

@@ -200,7 +200,7 @@ export function compileStep(
 }
 
 export function compileWorkflow(
-  workflow: WorkflowDef<any, any, any, any>,
+  workflow: WorkflowDef<any, any>,
   ctx: CompilerCtx,
 ): ExecutionPlan {
   let outputIndex: number | undefined;

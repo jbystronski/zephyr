@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  createModuleFactory,
-  createRuntimeRoot,
-} from "../../src/workflow-module";
+import { createModule, createRuntimeRoot } from "../../src/workflow-module";
 
 import { useLog } from "../../src";
 
@@ -25,47 +22,42 @@ describe("Retry handling at action level", () => {
       },
     };
 
-    const createMod = createModuleFactory<{ actions: typeof actions }>();
+    const createMod = createModule<{ actions: typeof actions }>();
 
     // Child workflow with retry on the action itself
-    const child = createMod({
-      define: ({ wf }) => {
-        const failStep = wf<{ a: number; b: number }>("failStep")
-          .init("failInit")
-          .seq(
-            "subAdd",
+    const child = createMod(({ wf }) => {
+      const failStep = wf<{ a: number; b: number }>("failStep")
+        .init("failInit")
+        .seq(
+          "subAdd",
 
-            (ctx) =>
-              ctx.actions.subAdd(ctx.get("failInit").a, ctx.get("failInit").b),
-            { retry: 4 }, // <--- retry on the action itself
-          )
-          .output((ctx) => ctx.get("subAdd"));
+          (ctx) =>
+            ctx.actions.subAdd(ctx.get("failInit").a, ctx.get("failInit").b),
+          { retry: 4 }, // <--- retry on the action itself
+        )
+        .output((ctx) => ctx.get("subAdd"));
 
-        return { failStep };
-      },
+      return { failStep };
     });
 
     // Parent workflow
-    const parent = createMod({
-      use: { child },
-      define: ({ wf, deps: { child } }) => {
-        const test = wf<{ x: number; y: number }>("test")
-          .init("test_init")
-          .seq(
-            "a",
+    const parent = createMod(({ wf }) => {
+      const test = wf<{ x: number; y: number }>("test")
+        .init("test_init")
+        .seq(
+          "a",
 
-            (ctx) =>
-              ctx.actions.add(ctx.get("test_init").x, ctx.get("test_init").y),
-            { retry: 3 }, // retry on the parent action
-          )
-          .subflow("b", child.failStep, (ctx) => ({
-            a: ctx.get("a"),
-            b: 10,
-          }))
-          .output((ctx) => ({ a: ctx.get("a"), b: ctx.get("b") }));
+          (ctx) =>
+            ctx.actions.add(ctx.get("test_init").x, ctx.get("test_init").y),
+          { retry: 3 }, // retry on the parent action
+        )
+        .subflow("b", child.failStep, (ctx) => ({
+          a: ctx.get("a"),
+          b: 10,
+        }))
+        .output((ctx) => ({ a: ctx.get("a"), b: ctx.get("b") }));
 
-        return { test };
-      },
+      return { test };
     });
 
     const r0 = createRuntimeRoot({

@@ -15,13 +15,13 @@ import { createWorkflow } from "./workflow-composer.js";
 
 export type WorkflowDef<
   Input,
-  Results,
-  Steps extends StepDef<any>[] = StepDef<any>[],
+  // Results,
+  // Steps extends StepDef<any>[] = StepDef<any>[],
   Output = undefined,
 > = {
   name?: string;
   __id: string;
-  steps: Steps;
+  steps: StepDef<any>[];
   // entrySteps: StepDef<any>[];
   endSteps: StepDef<any>[];
   // input: Input;
@@ -77,11 +77,10 @@ export type PipeNode = {
   exitMap: number[];
 };
 
-export type WorkflowInput<T> =
-  T extends WorkflowDef<infer I, any, any, any> ? I : never;
+export type WorkflowInput<T> = T extends WorkflowDef<infer I, any> ? I : never;
 
 export type WorkflowOutput<T> =
-  T extends WorkflowDef<any, any, any, infer O>
+  T extends WorkflowDef<any, infer O>
     ? unknown extends O
       ? undefined
       : O
@@ -210,19 +209,11 @@ type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
 // MODULE
 // -----------------------------------
 
-export type WorkflowResults<W> =
-  W extends WorkflowDef<any, infer R, any, any> ? R : never;
-
-export type ModuleContext<Deps, S extends ServiceRegistry> = {
-  wf: ReturnType<typeof createWorkflow<S>>;
-  deps: Deps;
-};
-
 declare const __services: unique symbol;
 
 export type Module<
   S extends ServiceRegistry,
-  WF extends Record<string, WorkflowDef<any, any, any, any>>,
+  WF extends Record<string, WorkflowDef<any, any>>,
 > = WF & {
   readonly [__services]: S;
 };
