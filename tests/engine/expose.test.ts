@@ -1,9 +1,14 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import { createModule, createRuntimeRoot } from "../../src/workflow-module";
+import { createModule } from "../../src/workflow-module";
 
-import { baseServices, StandardServices, useLog } from "../../src";
+import {
+  baseServices,
+  createRuntime,
+  StandardServices,
+  useLog,
+} from "../../src";
 
 const createMod = createModule<StandardServices>();
 
@@ -29,7 +34,7 @@ const parent = createMod(({ wf }) => {
 
 describe("Expose", () => {
   it("should execute workflow with alias", async () => {
-    const root = createRuntimeRoot(baseServices.build())
+    const root = createRuntime(baseServices.build())
       .addMod("parent", parent)
       .build();
 

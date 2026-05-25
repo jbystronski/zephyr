@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { createModule, createRuntimeRoot } from "../../src/workflow-module";
+import { createModule } from "../../src/workflow-module";
 
-import { eventStream, type StandardServices, useLog } from "../../src";
+import {
+  createRuntime,
+  eventStream,
+  type StandardServices,
+  useLog,
+} from "../../src";
 import { baseServices, createMeta } from "../../src/utils";
 
 eventStream.subscribe((ev: any) => {
@@ -44,7 +49,7 @@ const A = mod(({ wf }) => ({
 
 describe("Sync vs Async methods", () => {
   it("should correctly resolve sync call, async call (nested and direct)", async () => {
-    const root = createRuntimeRoot(services, meta).addMod("A", A).build();
+    const root = createRuntime(services, meta).addMod("A", A).build();
 
     const a = await root.run("A", "pay", {});
 

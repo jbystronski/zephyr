@@ -1,9 +1,15 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import { createModule, createRuntimeRoot } from "../../src/workflow-module";
+import { createModule } from "../../src/workflow-module";
 
-import { baseServices, createMeta, StandardServices, useLog } from "../../src";
+import {
+  baseServices,
+  createMeta,
+  createRuntime,
+  StandardServices,
+  useLog,
+} from "../../src";
 
 type PayService = {
   stripe: {
@@ -58,7 +64,7 @@ const s = baseServices
 
 describe("Subflow", () => {
   it("should execute subflow and return result", async () => {
-    const root = createRuntimeRoot(
+    const root = createRuntime(
       s,
       createMeta().service("stripe", { async: true }).build(),
     )

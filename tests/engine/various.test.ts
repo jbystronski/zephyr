@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { createModule, createRuntimeRoot } from "../../src/workflow-module";
+import { createModule } from "../../src/workflow-module";
 
-import { baseServices, eventStream, StandardServices, useLog } from "../../src";
+import {
+  baseServices,
+  createRuntime,
+  eventStream,
+  StandardServices,
+  useLog,
+} from "../../src";
 
 eventStream.subscribe((ev: any) => {
   console.dir(ev, { depth: 12 });
@@ -111,9 +117,9 @@ console.dir(modC.accessChained, { depth: 16 });
 
 const services = baseServices.build();
 
-const modAruntime = createRuntimeRoot(services).addMod("modA", modA).build();
+const modAruntime = createRuntime(services).addMod("modA", modA).build();
 
-const modCruntime = createRuntimeRoot(services).addMod("modC", modC).build();
+const modCruntime = createRuntime(services).addMod("modC", modC).build();
 
 describe("Various tests", () => {
   it("should correctly return objects array created from piped subflow", async () => {

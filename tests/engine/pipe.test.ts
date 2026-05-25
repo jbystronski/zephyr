@@ -1,9 +1,14 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import { createModule, createRuntimeRoot } from "../../src/workflow-module";
+import { createModule } from "../../src/workflow-module";
 
-import { baseServices, StandardServices, useLog } from "../../src";
+import {
+  baseServices,
+  createRuntime,
+  StandardServices,
+  useLog,
+} from "../../src";
 type S1 = {
   addAnimal: (input: { initArray: string[]; newAnimal: string }) => string[];
 };
@@ -175,7 +180,7 @@ const s = baseServices
 
   .build();
 
-const r0 = createRuntimeRoot(s).addMod("testPipe", testPipe).build();
+const r0 = createRuntime(s).addMod("testPipe", testPipe).build();
 
 describe("Pipe", () => {
   it("should execute pipe and return result", async () => {

@@ -119,7 +119,7 @@ type RuntimeBuilder<S, MM extends Record<string, Module<any, any>>> = {
 
 export function createRuntimeRoot<
   S extends ServiceRegistry,
-  MM extends Record<string, Module<any, any>>,
+  MM extends Record<string, Module<any, any>> = {},
 >(
   services: S,
   meta?: ServiceMetaRegistry<any>,

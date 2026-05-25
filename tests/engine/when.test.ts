@@ -1,8 +1,13 @@
 import { describe, it, expect } from "vitest";
 
-import { baseServices, StandardServices, useLog } from "../../src";
+import {
+  baseServices,
+  createRuntime,
+  StandardServices,
+  useLog,
+} from "../../src";
 
-import { createModule, createRuntimeRoot } from "../../src/workflow-module";
+import { createModule } from "../../src/workflow-module";
 
 const mod = createModule<StandardServices>()(({ wf }) => ({
   a: wf<{ input: number }>("a")
@@ -240,7 +245,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
     })),
 }));
 
-const root = createRuntimeRoot(baseServices.build()).addMod("mod", mod).build();
+const root = createRuntime(baseServices.build()).addMod("mod", mod).build();
 
 describe("Workflow engine - linear execution with when", () => {
   it("should execute steps in correct order and skip / run steps conditionally", async () => {
@@ -331,7 +336,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
         .output((ctx) => ctx.get("result")),
     }));
 
-    const rt = createRuntimeRoot(baseServices.build())
+    const rt = createRuntime(baseServices.build())
       .addMod("parent", parent)
       .build();
 
