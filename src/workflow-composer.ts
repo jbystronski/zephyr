@@ -268,7 +268,7 @@ export class WorkflowBuilder<
     return this as any;
   }
 
-  parallel<Branches extends readonly WorkflowBuilder<Config, any, any>[]>(
+  par<Branches extends readonly WorkflowBuilder<Config, any, any>[]>(
     ...branches: {
       [K in keyof Branches]: (
         builder: WorkflowBuilder<Config, [], Results>,
@@ -330,7 +330,7 @@ export class WorkflowBuilder<
     return this as any as WorkflowBuilder<Config, Steps, Results>;
   }
 
-  subflow<Prefix extends string, SF extends WorkflowDef<any, any>>(
+  sub<Prefix extends string, SF extends WorkflowDef<any, any>>(
     prefix: Prefix,
     sf: SF,
     resolve?: (ctx: ExprCtx<Config["services"], Results>) => WorkflowInput<SF>,
@@ -392,14 +392,6 @@ export class WorkflowBuilder<
 
     return this as any;
   }
-
-  private _subflow = this.subflow.bind(this);
-  sub = ((...args: Parameters<typeof this._subflow>) =>
-    this._subflow(...args)) as this["subflow"];
-
-  private _parallel = this.parallel.bind(this);
-  par = ((...args: Parameters<typeof this._parallel>) =>
-    this._parallel(...args)) as this["parallel"];
 
   if<ID extends string, R, Branch extends WorkflowBuilder<Config, any, any>>(
     id: ID,

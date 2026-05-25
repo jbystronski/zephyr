@@ -351,3 +351,14 @@ export type RuntimeOptions<MM extends Record<string, Module<any, any>>> = {
     };
   };
 };
+
+export type Runtime<MM extends Record<string, Module<any, any>>> = {
+  run<M extends keyof MM & string, K extends keyof MM[M] & string>(
+    modKey: M,
+    workflow: K,
+    input: WorkflowInput<MM[M][K]>,
+  ): Promise<{
+    output: WorkflowOutput<MM[M][K]>;
+    extras: Record<string, unknown>;
+  }>;
+};

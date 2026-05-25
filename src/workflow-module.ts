@@ -4,6 +4,7 @@ import { COMPILED_GRAPH, DEPS, MODULE_ID, UNSET } from "./symbols.js";
 import {
   ExecutionPlan,
   Module,
+  Runtime,
   RuntimeOptions,
   RuntimeServices,
   ServiceMetaRegistry,
@@ -34,7 +35,7 @@ export function createRuntimeRoot<MM extends Record<string, Module<any, any>>>({
   services: RuntimeServices<MM>;
   meta?: ServiceMetaRegistry<any>;
   options?: RuntimeOptions<MM>;
-}) {
+}): Runtime<MM> {
   const compiledCache: Map<string, ExecutionPlan> = new Map();
   console.log("cache bef", compiledCache);
   return {
