@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { createModule, createRuntime } from "../../src";
+import { createModule, createRuntime, createRuntimeBuilder } from "../../src";
 
 const calls: string[] = [];
 
@@ -30,7 +30,7 @@ describe("Parallel execution", () => {
         .build(),
     }));
 
-    const rt = createRuntime(local).addMod("mod", mod).build();
+    const rt = createRuntimeBuilder(local).addMod("mod", mod).build();
     await rt.run("mod", "test", {});
 
     expect(calls.sort()).toEqual(["A", "B", "C"]);

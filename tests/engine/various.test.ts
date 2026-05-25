@@ -4,6 +4,7 @@ import { createModule } from "../../src/workflow-module";
 import {
   baseServices,
   createRuntime,
+  createRuntimeBuilder,
   eventStream,
   StandardServices,
   useLog,
@@ -117,9 +118,9 @@ console.dir(modC.accessChained, { depth: 16 });
 
 const services = baseServices.build();
 
-const modAruntime = createRuntime(services).addMod("modA", modA).build();
+const modAruntime = createRuntimeBuilder(services).addMod("modA", modA).build();
 
-const modCruntime = createRuntime(services).addMod("modC", modC).build();
+const modCruntime = createRuntimeBuilder(services).addMod("modC", modC).build();
 
 describe("Various tests", () => {
   it("should correctly return objects array created from piped subflow", async () => {

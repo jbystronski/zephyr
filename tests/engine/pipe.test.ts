@@ -6,6 +6,7 @@ import { createModule } from "../../src/workflow-module";
 import {
   baseServices,
   createRuntime,
+  createRuntimeBuilder,
   StandardServices,
   useLog,
 } from "../../src";
@@ -180,7 +181,7 @@ const s = baseServices
 
   .build();
 
-const r0 = createRuntime(s).addMod("testPipe", testPipe).build();
+const r0 = createRuntimeBuilder(s).addMod("testPipe", testPipe).build();
 
 describe("Pipe", () => {
   it("should execute pipe and return result", async () => {

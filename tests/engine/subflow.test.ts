@@ -7,6 +7,7 @@ import {
   baseServices,
   createMeta,
   createRuntime,
+  createRuntimeBuilder,
   StandardServices,
   useLog,
 } from "../../src";
@@ -64,7 +65,7 @@ const s = baseServices
 
 describe("Subflow", () => {
   it("should execute subflow and return result", async () => {
-    const root = createRuntime(
+    const root = createRuntimeBuilder(
       s,
       createMeta().service("stripe", { async: true }).build(),
     )

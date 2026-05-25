@@ -3,7 +3,12 @@
 import { describe, it, expect } from "vitest";
 import { createModule } from "../../src/workflow-module";
 
-import { createRuntime, StandardServices, useLog } from "../../src";
+import {
+  createRuntime,
+  createRuntimeBuilder,
+  StandardServices,
+  useLog,
+} from "../../src";
 import { baseServices, createMeta } from "../../src/utils";
 type PayService = {
   stripe: {
@@ -64,7 +69,7 @@ const s = baseServices
 
 describe("Service injection", () => {
   it("should execute service call from sub mod and return result", async () => {
-    const root = createRuntime(
+    const root = createRuntimeBuilder(
       s,
 
       createMeta().service("stripe", { async: true }).build(),
