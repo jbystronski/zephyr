@@ -43,7 +43,7 @@ const child = mod(({ wf }) => ({
 
 const parent = mod(({ wf }) => {
   const test = wf("test")
-    .subflow("deepAction", child.deepAction, () => ({ init: "abc" }))
+    .sub("deepAction", child.deepAction, () => ({ init: "abc" }))
     .sub("result", child.sum, () => ({ a: 2, b: 3 }))
     .output((ctx) => ctx.get("result"));
 
@@ -58,11 +58,12 @@ const s = baseServices
 
 describe("Subflow", () => {
   it("should execute subflow and return result", async () => {
-    const root = createRuntimeRoot({
-      modules: { parent },
-      services: s,
-      meta: createMeta().service("stripe", { async: true }).build(),
-    });
+    const root = createRuntimeRoot(
+      s,
+      createMeta().service("stripe", { async: true }).build(),
+    )
+      .addMod("parent", parent)
+      .build();
 
     const res = await root.run("parent", "test", {});
 

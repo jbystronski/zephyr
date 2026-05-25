@@ -29,10 +29,9 @@ const parent = createMod(({ wf }) => {
 
 describe("Expose", () => {
   it("should execute workflow with alias", async () => {
-    const root = createRuntimeRoot({
-      modules: { parent },
-      services: baseServices.build(),
-    });
+    const root = createRuntimeRoot(baseServices.build())
+      .addMod("parent", parent)
+      .build();
 
     const res = await root.run("parent", "aliased", { a: 10, b: 10 });
 

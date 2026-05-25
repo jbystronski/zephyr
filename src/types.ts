@@ -209,15 +209,6 @@ type UnionToIntersection<U> = (U extends any ? (x: U) => any : never) extends (
 // MODULE
 // -----------------------------------
 
-declare const __services: unique symbol;
-
-export type Module<
-  S extends ServiceRegistry,
-  WF extends Record<string, WorkflowDef<any, any>>,
-> = WF & {
-  readonly [__services]: S;
-};
-
 // -----------------------------------
 // AST
 // -----------------------------------
@@ -322,12 +313,12 @@ export type CompiledExpr =
 
 export type StepExecutor = (rt: StepRuntimeCtx) => any;
 
-export type ExtractServices<M> = M extends { [__services]: infer S }
-  ? S
-  : never;
+// export type ExtractServices<M> = M extends { [__services]: infer S }
+//   ? S
+//   : never;
 
-export type RuntimeServices<MM extends Record<string, Module<any, any>>> =
-  UnionToIntersection<ExtractServices<MM[keyof MM]>>;
+// export type RuntimeServices<MM extends Record<string, Module<any, any>>> =
+//   UnionToIntersection<ExtractServices<MM[keyof MM]>>;
 
 export type RuntimeOptions<MM extends Record<string, Module<any, any>>> = {
   global?: {
@@ -352,6 +343,14 @@ export type RuntimeOptions<MM extends Record<string, Module<any, any>>> = {
   };
 };
 
+// export type UnionServices<MM> = MM[keyof MM] extends infer M
+//   ? M extends Module<any, any>
+//     ? M extends Module<infer S, any>
+//       ? S
+//       : never
+//     : never
+//   : never;
+
 export type Runtime<MM extends Record<string, Module<any, any>>> = {
   run<M extends keyof MM & string, K extends keyof MM[M] & string>(
     modKey: M,
@@ -362,3 +361,17 @@ export type Runtime<MM extends Record<string, Module<any, any>>> = {
     extras: Record<string, unknown>;
   }>;
 };
+
+// declare const __services: unique symbol;
+
+// export type Module<
+//   S extends ServiceRegistry,
+//   WF extends Record<string, WorkflowDef<any, any>>,
+// > = WF & {
+//   __services: S;
+// };
+
+export type Module<
+  S extends ServiceRegistry,
+  WF extends Record<string, WorkflowDef<any, any>>,
+> = WF;

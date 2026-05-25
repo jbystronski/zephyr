@@ -21,7 +21,7 @@ describe("Parallel execution", () => {
 
     const mod = createModule<typeof local>()(({ wf }) => ({
       test: wf("parllel-test")
-        .parallel(
+        .par(
           (b) => b.seq("a", (_) => _.actions.a()),
           (b) => b.seq("b", (_) => _.actions.b()),
           (b) => b.seq("c", (_) => _.actions.c()),
@@ -30,7 +30,7 @@ describe("Parallel execution", () => {
         .build(),
     }));
 
-    const rt = createRuntimeRoot({ modules: { mod }, services: { ...local } });
+    const rt = createRuntimeRoot(local).addMod("mod", mod).build();
     await rt.run("mod", "test", {});
 
     expect(calls.sort()).toEqual(["A", "B", "C"]);

@@ -111,15 +111,9 @@ console.dir(modC.accessChained, { depth: 16 });
 
 const services = baseServices.build();
 
-const modAruntime = createRuntimeRoot({
-  modules: { modA },
-  services,
-});
+const modAruntime = createRuntimeRoot(services).addMod("modA", modA).build();
 
-const modCruntime = createRuntimeRoot({
-  modules: { modC },
-  services,
-});
+const modCruntime = createRuntimeRoot(services).addMod("modC", modC).build();
 
 describe("Various tests", () => {
   it("should correctly return objects array created from piped subflow", async () => {

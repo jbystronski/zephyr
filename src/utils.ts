@@ -33,9 +33,9 @@ export function createAliasResolver(results: any, aliasMap: any) {
   };
 }
 
-export type ServiceMap = Record<string, any>;
-
-export class ServiceBuilder<S extends ServiceMap> {
+// export type ServiceMap = Record<string, any>;
+export interface ServiceMap {}
+export class ServiceBuilder<S extends ServiceMap = {}> {
   constructor(private services: S) {}
 
   add<K extends string, T>(

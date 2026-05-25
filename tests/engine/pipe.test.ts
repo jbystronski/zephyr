@@ -175,10 +175,7 @@ const s = baseServices
 
   .build();
 
-const r0 = createRuntimeRoot({
-  modules: { testPipe },
-  services: s,
-});
+const r0 = createRuntimeRoot(s).addMod("testPipe", testPipe).build();
 
 describe("Pipe", () => {
   it("should execute pipe and return result", async () => {

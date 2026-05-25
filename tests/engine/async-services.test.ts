@@ -44,11 +44,7 @@ const A = mod(({ wf }) => ({
 
 describe("Sync vs Async methods", () => {
   it("should correctly resolve sync call, async call (nested and direct)", async () => {
-    const root = createRuntimeRoot({
-      modules: { A },
-      services,
-      meta,
-    });
+    const root = createRuntimeRoot(services, meta).addMod("A", A).build();
 
     const a = await root.run("A", "pay", {});
 

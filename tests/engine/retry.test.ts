@@ -10,19 +10,21 @@ describe("Retry handling at action level", () => {
 
     // Fake registry
     const actions = {
-      add: (a: number, b: number) => {
-        retriesA++;
-        if (retriesA < 2) throw new Error("temporary fail"); // fail once
-        return a + b;
-      },
-      subAdd: (a: number, b: number) => {
-        retriesSubAdd++;
-        if (retriesSubAdd < 3) throw new Error("temporary subAdd fail"); // fail twice
-        return a + b;
+      math: {
+        add: (a: number, b: number) => {
+          retriesA++;
+          if (retriesA < 2) throw new Error("temporary fail"); // fail once
+          return a + b;
+        },
+        subAdd: (a: number, b: number) => {
+          retriesSubAdd++;
+          if (retriesSubAdd < 3) throw new Error("temporary subAdd fail"); // fail twice
+          return a + b;
+        },
       },
     };
 
-    const createMod = createModule<{ actions: typeof actions }>();
+    const createMod = createModule<{ math: (typeof actions)["math"] }>();
 
     // Child workflow with retry on the action itself
     const child = createMod(({ wf }) => {
@@ -32,7 +34,7 @@ describe("Retry handling at action level", () => {
           "subAdd",
 
           (ctx) =>
-            ctx.actions.subAdd(ctx.get("failInit").a, ctx.get("failInit").b),
+            ctx.math.subAdd(ctx.get("failInit").a, ctx.get("failInit").b),
           { retry: 4 }, // <--- retry on the action itself
         )
         .output((ctx) => ctx.get("subAdd"));
@@ -47,11 +49,10 @@ describe("Retry handling at action level", () => {
         .seq(
           "a",
 
-          (ctx) =>
-            ctx.actions.add(ctx.get("test_init").x, ctx.get("test_init").y),
+          (ctx) => ctx.math.add(ctx.get("test_init").x, ctx.get("test_init").y),
           { retry: 3 }, // retry on the parent action
         )
-        .subflow("b", child.failStep, (ctx) => ({
+        .sub("b", child.failStep, (ctx) => ({
           a: ctx.get("a"),
           b: 10,
         }))
@@ -60,10 +61,7 @@ describe("Retry handling at action level", () => {
       return { test };
     });
 
-    const r0 = createRuntimeRoot({
-      modules: { parent },
-      services: { actions },
-    });
+    const r0 = createRuntimeRoot(actions).addMod("parent", parent).build();
 
     const res = await r0.run("parent", "test", { x: 1, y: 2 });
 

@@ -57,7 +57,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       (ctx) => ctx.logic.eq(ctx.get("step2"), 12),
       (b) =>
         b
-          .parallel(
+          .par(
             (b0) =>
               b0
                 .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1)) // 13
@@ -93,7 +93,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       (ctx) => ctx.logic.eq(ctx.get("step2"), 999),
       (b) =>
         b
-          .parallel(
+          .par(
             (b0) =>
               b0
                 .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1))
@@ -125,7 +125,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
     .seq("step1", (ctx) => ctx.math.add(ctx.get("e").input, 3)) // 3 + 3 = 6
     .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 6 * 2 = 12
 
-    .parallel(
+    .par(
       // ✅ runs (12 === 12)
       (b0) =>
         b0.if(
@@ -170,7 +170,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       "step2 equals 12",
       (ctx) => ctx.logic.eq(ctx.get("step2"), 12),
       (b) =>
-        b.parallel(
+        b.par(
           // ✅ both conditions TRUE → runs
           (b0) =>
             b0.if(
@@ -215,7 +215,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       (ctx) => ctx.logic.eq(ctx.get("step2"), 999),
       (b) =>
         b
-          .parallel(
+          .par(
             (b0) =>
               b0
                 .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1))
@@ -240,10 +240,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
     })),
 }));
 
-const root = createRuntimeRoot({
-  modules: { mod },
-  services: baseServices.build(),
-});
+const root = createRuntimeRoot(baseServices.build()).addMod("mod", mod).build();
 
 describe("Workflow engine - linear execution with when", () => {
   it("should execute steps in correct order and skip / run steps conditionally", async () => {
@@ -328,16 +325,15 @@ describe("Workflow engine - parallel with independent when per branch", () => {
         .if(
           "true equals false",
           (ctx) => ctx.logic.eq(true, false),
-          (b) => b.subflow("result", child.sum, () => ({ a: 2, b: 3 })),
+          (b) => b.sub("result", child.sum, () => ({ a: 2, b: 3 })),
         ) // ❌ skip subflow
 
         .output((ctx) => ctx.get("result")),
     }));
 
-    const rt = createRuntimeRoot({
-      modules: { parent },
-      services: baseServices.build(),
-    });
+    const rt = createRuntimeRoot(baseServices.build())
+      .addMod("parent", parent)
+      .build();
 
     const res = await rt.run("parent", "test", {});
 

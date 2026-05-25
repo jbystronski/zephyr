@@ -45,8 +45,8 @@ const local = mod(({ wf }) => ({
 const parent = mod(({ wf }) => {
   const test = wf("test")
     .init("i")
-    .subflow("macro", local.localTwo, () => ({}))
-    .subflow("result", child.pay, () => ({
+    .sub("macro", local.localTwo, () => ({}))
+    .sub("result", child.pay, () => ({
       amount: 400,
     }))
 
@@ -64,12 +64,13 @@ const s = baseServices
 
 describe("Service injection", () => {
   it("should execute service call from sub mod and return result", async () => {
-    const root = createRuntimeRoot({
-      modules: { parent },
-      services: s,
+    const root = createRuntimeRoot(
+      s,
 
-      meta: createMeta().service("stripe", { async: true }).build(),
-    });
+      createMeta().service("stripe", { async: true }).build(),
+    )
+      .addMod("parent", parent)
+      .build();
 
     const r0 = await root.run("parent", "test", { amount: 44 });
 
