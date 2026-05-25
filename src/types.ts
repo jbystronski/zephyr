@@ -320,27 +320,14 @@ export type StepExecutor = (rt: StepRuntimeCtx) => any;
 // export type RuntimeServices<MM extends Record<string, Module<any, any>>> =
 //   UnionToIntersection<ExtractServices<MM[keyof MM]>>;
 
-export type RuntimeOptions<MM extends Record<string, Module<any, any>>> = {
-  global?: {
-    precompile?: boolean;
-    observers?: WorkflowObserver[];
-  };
+type AvailableOpts = {
+  observers?: WorkflowObserver[];
+};
 
-  modules?: {
-    [M in keyof MM]?: {
-      precompile?: boolean;
-      observers?: WorkflowObserver[];
-    };
-  };
-
-  workflows?: {
-    [M in keyof MM]?: {
-      [W in keyof MM[M]]?: {
-        precompile?: boolean;
-        observers?: WorkflowObserver[];
-      };
-    };
-  };
+export type RuntimeOptions = {
+  global?: AvailableOpts;
+  modules?: Record<string, AvailableOpts>;
+  workflows?: Record<string, AvailableOpts>;
 };
 
 // export type UnionServices<MM> = MM[keyof MM] extends infer M
