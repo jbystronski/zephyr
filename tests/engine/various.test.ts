@@ -4,7 +4,6 @@ import { createModule } from "../../src/workflow-module";
 import {
   baseServices,
   createRuntime,
-  createRuntimeBuilder,
   eventStream,
   StandardServices,
   useLog,
@@ -118,13 +117,11 @@ console.dir(modC.accessChained, { depth: 16 });
 
 const services = baseServices.build();
 
-const modAruntime = createRuntimeBuilder(services).addMod("modA", modA).build();
-
-const modCruntime = createRuntimeBuilder(services).addMod("modC", modC).build();
+const rt = createRuntime({ services });
 
 describe("Various tests", () => {
   it("should correctly return objects array created from piped subflow", async () => {
-    const testOne = await modAruntime.run("modA", "createObjects", {
+    const testOne = await rt.run(modA.createObjects, {
       initData: [
         { kind: "bucket", label: "emails" },
         { kind: "bucket", label: "configs" },
@@ -154,7 +151,7 @@ describe("Various tests", () => {
   });
 
   it("should access AST value chained on call expression resolution", async () => {
-    const testChained = await modCruntime.run("modC", "accessChained", {
+    const testChained = await rt.run(modC.accessChained, {
       nestedObject: { foo: { bar: "BAZ" } },
     });
 
@@ -162,7 +159,7 @@ describe("Various tests", () => {
   });
 
   it("should correctly return find explorer object if key exists", async () => {
-    const testTwo = await modCruntime.run("modC", "createObjectsAndFind", {
+    const testTwo = await rt.run(modC.createObjectsAndFind, {
       initData: [
         { kind: "bucket", label: "emails" },
         { kind: "bucket", label: "configs" },

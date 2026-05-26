@@ -6,7 +6,6 @@ import { createModule } from "../../src/workflow-module";
 import {
   baseServices,
   createRuntime,
-  createRuntimeBuilder,
   StandardServices,
   useLog,
 } from "../../src";
@@ -35,11 +34,9 @@ const parent = createMod(({ wf }) => {
 
 describe("Expose", () => {
   it("should execute workflow with alias", async () => {
-    const root = createRuntimeBuilder(baseServices.build())
-      .addMod("parent", parent)
-      .build();
+    const root = createRuntime({ services: baseServices.build() });
 
-    const res = await root.run("parent", "aliased", { a: 10, b: 10 });
+    const res = await root.run(parent.aliased, { a: 10, b: 10 });
 
     expect(res.output).toBe(20);
   });

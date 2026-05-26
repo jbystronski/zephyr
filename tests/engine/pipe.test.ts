@@ -6,7 +6,6 @@ import { createModule } from "../../src/workflow-module";
 import {
   baseServices,
   createRuntime,
-  createRuntimeBuilder,
   StandardServices,
   useLog,
 } from "../../src";
@@ -181,11 +180,11 @@ const s = baseServices
 
   .build();
 
-const r0 = createRuntimeBuilder(s).addMod("testPipe", testPipe).build();
+const r0 = createRuntime({ services: s });
 
 describe("Pipe", () => {
   it("should execute pipe and return result", async () => {
-    const res = await r0.run("testPipe", "test", {
+    const res = await r0.run(testPipe.test, {
       elements: ["cat", "dog", "bird"],
       another: "fish",
     });
@@ -194,7 +193,7 @@ describe("Pipe", () => {
   });
 
   it("should return first matching result from pipe", async () => {
-    const r = await r0.run("testPipe", "findFirstArcticBird", {
+    const r = await r0.run(testPipe.findFirstArcticBird, {
       data: transformables,
     });
 
@@ -206,7 +205,7 @@ describe("Pipe", () => {
   });
 
   it("should evaluate some pipe condtion to true", async () => {
-    const r = await r0.run("testPipe", "someAreTropical", {
+    const r = await r0.run(testPipe.someAreTropical, {
       data: transformables,
     });
 
@@ -214,7 +213,7 @@ describe("Pipe", () => {
   });
 
   it("should evaluate every pipe condtion to false", async () => {
-    const r = await r0.run("testPipe", "everyIsArctic", {
+    const r = await r0.run(testPipe.everyIsArctic, {
       data: transformables,
     });
 
@@ -222,7 +221,7 @@ describe("Pipe", () => {
   });
 
   it("should filter reptiles", async () => {
-    const r = await r0.run("testPipe", "reptilesOnly", {
+    const r = await r0.run(testPipe.reptilesOnly, {
       data: transformables,
     });
 

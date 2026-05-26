@@ -3,7 +3,6 @@ import { createModule } from "../../src/workflow-module";
 
 import {
   createRuntime,
-  createRuntimeBuilder,
   eventStream,
   type StandardServices,
   useLog,
@@ -50,9 +49,9 @@ const A = mod(({ wf }) => ({
 
 describe("Sync vs Async methods", () => {
   it("should correctly resolve sync call, async call (nested and direct)", async () => {
-    const root = createRuntimeBuilder(services, meta).addMod("A", A).build();
+    const root = createRuntime({ services, meta });
 
-    const a = await root.run("A", "pay", {});
+    const a = await root.run(A.pay, {});
 
     expect(a.output).toEqual({
       a: 33,

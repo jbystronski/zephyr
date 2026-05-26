@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createModule } from "../../src/workflow-module";
 
-import { createRuntime, createRuntimeBuilder, useLog } from "../../src";
+import { createRuntime, useLog } from "../../src";
 
 describe("Retry handling at action level", () => {
   it("should retry actions inside subflows according to retry count", async () => {
@@ -61,9 +61,9 @@ describe("Retry handling at action level", () => {
       return { test };
     });
 
-    const r0 = createRuntimeBuilder(actions).addMod("parent", parent).build();
+    const r0 = createRuntime({ services: actions });
 
-    const res = await r0.run("parent", "test", { x: 1, y: 2 });
+    const res = await r0.run(parent.test, { x: 1, y: 2 });
 
     // ✅ Verify retry counts
     expect(retriesA).toBe(2); // retried once
