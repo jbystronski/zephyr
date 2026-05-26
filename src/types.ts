@@ -21,6 +21,7 @@ export type WorkflowDef<
 > = {
   name?: string;
   __id: string;
+  __stack: string[];
   steps: StepDef<any>[];
   // entrySteps: StepDef<any>[];
   endSteps: StepDef<any>[];
@@ -326,8 +327,11 @@ type AvailableOpts = {
 
 export type RuntimeOptions = {
   global?: AvailableOpts;
-  modules?: Record<string, AvailableOpts>;
-  workflows?: Record<string, AvailableOpts>;
+
+  workflows: {
+    ids: string[];
+    options: AvailableOpts;
+  };
 };
 
 // export type UnionServices<MM> = MM[keyof MM] extends infer M

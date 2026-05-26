@@ -58,10 +58,10 @@ export class WorkflowBuilder<
   private idx = 0;
   private initIdx?: number | undefined = undefined;
   private outputIdx?: number;
-  private inlineStack: string[] = [];
+  private workflowStack: string[] = [];
 
   constructor(private name: string) {
-    this.inlineStack.push(this.__id);
+    this.workflowStack.push(this.__id);
   }
 
   get id() {
@@ -216,6 +216,7 @@ export class WorkflowBuilder<
       // name: `${id}_pipe`,
       steps: built.steps,
       initIdx: built.initIdx,
+      __stack: this.workflowStack,
 
       // aliasMap: {
       //   results: Object.fromEntries(built.steps.map((s) => [s.id, s.idx])),
@@ -344,6 +345,12 @@ export class WorkflowBuilder<
       throw new Error(`Subflow not found`);
     }
 
+    if (sf.__stack.includes(this.__id)) {
+      throw new Error(
+        `Cycle detected: ${sf.__stack.join(" -> ")} -> ${this.__id}`,
+      );
+    }
+
     const targetId = (sf as any).__id;
 
     if (!targetId) {
@@ -351,14 +358,8 @@ export class WorkflowBuilder<
     }
 
     // ❗ CYCLE CHECK
-    if (this.inlineStack.includes(targetId)) {
-      throw new Error(
-        `Cycle detected: ${this.inlineStack.join(" -> ")} -> ${targetId}`,
-      );
-    }
 
-    this.inlineStack.push(targetId);
-    this.inlineStack = [...new Set(this.inlineStack)];
+    this.workflowStack = [...this.workflowStack, ...sf.__stack];
 
     const expr = resolve ? resolve(createExprCtx(this.idToIdx)) : null;
 
@@ -474,6 +475,7 @@ export class WorkflowBuilder<
     return {
       __id: this.id,
       name: this.name,
+      __stack: this.workflowStack,
 
       steps: this.steps as Steps,
       // entrySteps: this.steps.filter((s) => s.dependsOn.length === 0),
