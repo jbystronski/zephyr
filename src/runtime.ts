@@ -59,6 +59,8 @@ export function createRuntime<S extends ServiceRegistry>({
 
       const plan = compiledCache.get(wf.__id);
 
+      console.log("plans", compiledCache);
+
       if (!plan) {
         throw new Error(`Compiled plan not found`);
       } else {
@@ -75,7 +77,7 @@ export function createRuntime<S extends ServiceRegistry>({
         }
 
         const output = await executor(results, {});
-        console.dir(compiledCache, { depth: 16 });
+
         return {
           output,
           extras: {},

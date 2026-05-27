@@ -287,7 +287,7 @@ type AvailableOpts = {
 export type RuntimeOptions = {
   global?: AvailableOpts;
 
-  workflows: {
+  workflows?: {
     ids: string[];
     options: AvailableOpts;
   };

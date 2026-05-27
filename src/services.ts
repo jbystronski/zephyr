@@ -491,8 +491,6 @@ export const logicLib = {
 
 // good for workflows
 export const miscLib = {
-  identity: <T>(v: T) => v,
-
   isNil: (v: any) => v == null,
   isNumber: (v: any) => typeof v === "number",
   isString: (v: any) => typeof v === "string",

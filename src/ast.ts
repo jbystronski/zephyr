@@ -139,26 +139,69 @@ export function createExprCtx(idToIdx: Record<string, number>): any {
   });
 }
 
+// export function remapWorkflowInstance(
+//   subWf: any,
+//
+//   inputAst: any,
+//   parentFrontier: number[],
+//   offset: number,
+// ) {
+//   const { wf, maxIdx } = offsetWorkflow(subWf, offset);
+//
+//   // fix init
+//   const initIdx = subWf.initIdx + offset;
+//
+//   const initStep = wf.steps.find((s: any) => s.idx === initIdx);
+//
+//   if (initStep) {
+//     initStep.dependsOn = parentFrontier.length ? [...parentFrontier] : [];
+//
+//     if (initStep.spec === "__init__") {
+//       delete initStep.spec;
+//       initStep.resolve = inputAst;
+//     }
+//   }
+//
+//   const outputIdx =
+//     subWf.outputIdx !== undefined ? subWf.outputIdx + offset : undefined;
+//
+//   return {
+//     wf,
+//     outputIdx,
+//     maxIdx,
+//   };
+// }
+
 export function remapWorkflowInstance(
   subWf: any,
-
   inputAst: any,
   parentFrontier: number[],
   offset: number,
 ) {
   const { wf, maxIdx } = offsetWorkflow(subWf, offset);
 
-  // fix init
-  const initIdx = subWf.initIdx + offset;
+  // explicit init workflow
+  if (typeof subWf.initIdx === "number") {
+    const initIdx = subWf.initIdx + offset;
 
-  const initStep = wf.steps.find((s: any) => s.idx === initIdx);
+    const initStep = wf.steps.find((s: any) => s.idx === initIdx);
 
-  if (initStep) {
-    initStep.dependsOn = parentFrontier.length ? [...parentFrontier] : [];
+    if (initStep) {
+      initStep.dependsOn = [...parentFrontier];
 
-    if (initStep.spec === "__init__") {
-      delete initStep.spec;
-      initStep.resolve = inputAst;
+      if (initStep.spec === "__init__") {
+        delete initStep.spec;
+        initStep.resolve = inputAst;
+      }
+    }
+  }
+
+  // no init workflow
+  else {
+    const entrySteps = wf.steps.filter((s: any) => s.dependsOn.length === 0);
+
+    for (const step of entrySteps) {
+      step.dependsOn = [...parentFrontier];
     }
   }
 
