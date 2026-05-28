@@ -210,6 +210,7 @@ export const stringLib = {
   lower: (s: string) => s.toLowerCase(),
   upper: (s: string) => s.toUpperCase(),
   trim: (s: string) => s.trim(),
+  trimWhitespace: (str: string) => str.replace(/\/+$/g, ""),
 
   includes: (s: string, sub: string) => s.includes(sub),
   startsWith: (s: string, sub: string) => s.startsWith(sub),
@@ -224,6 +225,27 @@ export const stringLib = {
   join: (arr: string[], sep: string) => arr.join(sep),
 
   length: (s: string) => s.length,
+
+  toKebabCase: (str: string): string => {
+    return str
+      .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+      .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+      .replace(/^([A-Z])/, "-$1")
+      .toLowerCase();
+  },
+
+  capitalize: (str: string): string => {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  },
+
+  toUrl: (input: string, separator: "-" | "_" = "-"): string => {
+    return input
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, separator);
+  },
 };
 
 export const arrayLib = {
@@ -375,6 +397,27 @@ export const arrayLib = {
         return Array.isArray(value) ? value : [value];
       })
       .filter((v) => v !== undefined);
+  },
+
+  random: (arr: any[]): any | undefined => {
+    if (!arr.length) return undefined;
+    const index = Math.floor(Math.random() * arr.length);
+    return arr[index];
+  },
+
+  randomSubset: (arr: any[], min: number, max: number): any[] => {
+    if (!arr.length || min > arr.length) return [];
+
+    const size = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    // shuffle a copy of the array (Fisher-Yates)
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+
+    return copy.slice(0, Math.min(size, copy.length));
   },
 };
 
