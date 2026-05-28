@@ -35,7 +35,7 @@ describe("Retry handling at action level", () => {
 
           (ctx) =>
             ctx.math.subAdd(ctx.get("failInit").a, ctx.get("failInit").b),
-          { retry: 4 }, // <--- retry on the action itself
+          { retry: { count: 4 } }, // <--- retry on the action itself
         )
         .output((ctx) => ctx.get("subAdd"));
 
@@ -50,7 +50,7 @@ describe("Retry handling at action level", () => {
           "a",
 
           (ctx) => ctx.math.add(ctx.get("test_init").x, ctx.get("test_init").y),
-          { retry: 3 }, // retry on the parent action
+          { retry: { count: 3 } }, // retry on the parent action
         )
         .sub("b", child.failStep, (ctx) => ({
           a: ctx.get("a"),

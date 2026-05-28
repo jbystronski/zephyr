@@ -51,7 +51,7 @@ function createFastExecutor(
           }
 
           if (results[step.idx] === undefined) {
-            results[step.idx] = await executeStep(step, rt);
+            results[step.idx] = await executeStepWithOptions(step, rt);
           }
         }),
       );
@@ -59,6 +59,74 @@ function createFastExecutor(
 
     return results[plan.outputIndex ?? plan.exitIndexes?.[0] ?? 0];
   };
+}
+
+// async function executeStepWithOptions(step: CompiledStep, rt: StepRuntimeCtx) {
+//   const opts = step.options;
+//
+//   const run = () => executeStep(step, rt);
+//
+//   try {
+//     let execution = run();
+//
+//     if (opts?.timeout) {
+//       execution = withTimeout(execution, opts.timeout);
+//     }
+//
+//     if (opts?.retry) {
+//       execution = runWithRetry(() => execution, {
+//         retry: opts.retry.count,
+//         retryDelay: opts.retry.delay,
+//       });
+//     }
+//
+//     return await execution;
+//   } catch (err) {
+//     if (opts?.fallback !== undefined) {
+//       return opts.fallback;
+//     }
+//
+//     if (opts?.swallow === true) {
+//       return undefined;
+//     }
+//
+//     throw err;
+//   }
+// }
+
+async function executeStepWithOptions(step: CompiledStep, rt: StepRuntimeCtx) {
+  const opts = step.options;
+
+  const execute = async () => {
+    let execution = executeStep(step, rt);
+
+    if (opts?.timeout) {
+      execution = withTimeout(execution, opts.timeout);
+    }
+
+    return await execution;
+  };
+
+  try {
+    if (opts?.retry) {
+      return await runWithRetry(execute, {
+        retry: opts.retry.count,
+        retryDelay: opts.retry?.delay ?? 0,
+      });
+    }
+
+    return await execute();
+  } catch (err) {
+    if (opts?.fallback !== undefined) {
+      return opts.fallback;
+    }
+
+    if (opts?.swallow === true) {
+      return undefined;
+    }
+
+    throw err;
+  }
 }
 
 function createObservedExecutor(
@@ -103,7 +171,7 @@ function createObservedExecutor(
             frame.attempts++;
 
             if (results[step.idx] === undefined) {
-              const value = await executeStep(step, rt);
+              const value = await executeStepWithOptions(step, rt);
               results[step.idx] = value;
             }
 
@@ -172,7 +240,7 @@ async function runPipeWorkflow(
         };
 
         if (results[step.idx] === undefined) {
-          results[step.idx] = await executeStep(step, rt);
+          results[step.idx] = await executeStepWithOptions(step, rt);
         }
       }),
     );

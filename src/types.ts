@@ -11,7 +11,6 @@ import {
   stringLib,
 } from "./services.js";
 import { DEPS, EXEC_GRAPH, MODULE_ID } from "./symbols.js";
-import { createWorkflow } from "./workflow-composer.js";
 
 export type WorkflowDef<Input, Output = undefined> = {
   name?: string;
@@ -78,26 +77,33 @@ export type StepDef<ID extends string = string> = {
   guards?: number[];
 
   resolve: Expr;
-  options?: StepOptions<any>;
+  options?: StepOptions;
   spec?: StepSpec;
   pipe?: PipeNode;
 };
 
-export type StepOptions<Results> = {
-  retry?: number;
-  retryDelay?: number | ((attempt: number) => number);
+export type StepOptions = {
   timeout?: number;
 
-  continueOnError?: boolean;
-
-  onError?: (err: unknown, ctx: StepCtx<Results>) => any;
-  pipe?: {
-    parallel?: boolean;
+  retry?: {
+    count: number;
+    delay?: number;
   };
 
-  // optional later:
-  label?: string;
-  meta?: Record<string, any>;
+  fallback?: unknown;
+
+  swallow?: boolean;
+
+  optional?: boolean;
+
+  cache?: {
+    ttl?: number;
+    key?: string;
+  };
+
+  concurrency?: {
+    limit?: number;
+  };
 };
 
 export type Simplify<T> = {
@@ -255,6 +261,7 @@ export type CompiledStep = {
   idx: number; // graph id (debug)
   deps: number[];
   guards: number[];
+  options?: StepOptions;
   spec?: StepSpec;
   resolve: StepExecutor | null;
   pipe?: {

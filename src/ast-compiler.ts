@@ -188,6 +188,7 @@ export function compileStep(
     idx: step.idx,
     deps: step.dependsOn,
     guards: step.guards ?? [],
+    options: step.options,
     spec: step.spec,
     resolve: step.resolve ? createStepExecutor(step, ctx) : null,
     pipe: step.pipe
@@ -243,31 +244,5 @@ export function compileWorkflow(
     outputIndex,
     exitIndexes: exitIndexes ?? [],
     maxIndex,
-  };
-}
-
-export function compileModule(mod: any, services: any, meta?: any): any {
-  const deps = mod[DEPS] ?? {};
-
-  const compiledDeps = Object.fromEntries(
-    Object.entries(deps).map(([name, child]: any) => [
-      name,
-      compileModule(child, services, meta),
-    ]),
-  );
-
-  const compiledGraph = Object.fromEntries(
-    Object.entries(mod[EXEC_GRAPH]).map(([wfId, wf]: any) => [
-      wfId,
-      compileWorkflow(wf, { meta }),
-    ]),
-  );
-
-  return {
-    ...mod,
-
-    [DEPS]: compiledDeps,
-
-    [COMPILED_GRAPH]: compiledGraph,
   };
 }

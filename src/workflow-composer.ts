@@ -40,8 +40,6 @@ type MergeBranchSteps<
     >
   : Acc;
 
-type NewType<Results> = StepOptions<Results>;
-
 export class WorkflowBuilder<
   Config extends WFConfig<unknown, ServiceRegistry>,
   Steps extends StepDef<any>[] = [],
@@ -105,7 +103,7 @@ export class WorkflowBuilder<
 
     resolve?: (ctx: ExprCtx<Config["services"], Results>) => R,
 
-    options?: NewType<Results>,
+    options?: StepOptions,
   ): WorkflowBuilder<
     Config,
     [...Steps, StepDef<ID>],
@@ -124,14 +122,19 @@ export class WorkflowBuilder<
 
     const ast = expr != null ? toExpr(expr) : null;
 
-    this.steps.push({
+    const s: StepDef<any> = {
       id,
       idx: this.idx,
       resolve: ast,
       dependsOn: deps,
       guards: [...(this.guards ?? [])],
-      options,
-    });
+    };
+
+    if (options) {
+      s["options"] = options;
+    }
+
+    this.steps.push(s);
 
     this.frontier = [this.idx];
 
@@ -161,7 +164,7 @@ export class WorkflowBuilder<
         Results
       >,
     ) => Branch,
-    options?: StepOptions<Results>,
+    options?: StepOptions,
   ): WorkflowBuilder<
     Config,
     Steps,
