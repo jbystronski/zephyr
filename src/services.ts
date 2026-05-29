@@ -266,7 +266,7 @@ export const arrayLib = {
     return arr.length >= min;
   },
 
-  allEqual: (values: readonly any[]): boolean => {
+  allValuesEqual: (values: any[]): boolean => {
     if (values.length === 0) return true;
     const firstType = typeof values[0];
     const firstValue = values[0];
@@ -274,6 +274,14 @@ export const arrayLib = {
     if (!values.every((v) => typeof v === firstType)) return false;
 
     return values.every((v) => v === firstValue);
+  },
+
+  // 4. Check if arrays are equal (same elements, order doesn't matter)
+  areEqual: (arrayA: any[], arrayB: any[]): boolean => {
+    if (arrayA.length !== arrayB.length) return false;
+    const setA = new Set(arrayA);
+    const setB = new Set(arrayB);
+    return [...setA].every((item) => setB.has(item));
   },
 
   length: (arr: any[]) => arr?.length ?? 0,
@@ -301,6 +309,38 @@ export const arrayLib = {
     const a = [...(arr ?? [])];
     a.splice(i, 1, item); // Note: 1 as delete count
     return a;
+  },
+
+  findDuplicates: (array: any[]): any[] => {
+    const seen = new Set();
+    const duplicates = new Set();
+
+    for (const item of array) {
+      if (seen.has(item)) {
+        duplicates.add(item);
+      } else {
+        seen.add(item);
+      }
+    }
+
+    return [...duplicates];
+  },
+
+  // 9. Partition array based on membership in another array
+  partition: (arrayA: any[], arrayB: any[]): [any[], any[]] => {
+    const setB = new Set(arrayB);
+    const inBoth: any[] = [];
+    const onlyInA: any[] = [];
+
+    for (const item of arrayA) {
+      if (setB.has(item)) {
+        inBoth.push(item);
+      } else {
+        onlyInA.push(item);
+      }
+    }
+
+    return [inBoth, onlyInA];
   },
 
   replaceFirst: (arr: any[], item: any) =>
@@ -359,6 +399,42 @@ export const arrayLib = {
     return [...counts.entries()]
       .filter(([, count]) => count < total)
       .map(([item]) => item);
+  },
+
+  // 1. Elements that exist in BOTH A and B (Intersection)
+  intersection: (arrayA: any[], arrayB: any[]): any[] => {
+    const setB = new Set(arrayB);
+    return [...new Set(arrayA)].filter((item) => setB.has(item));
+  },
+
+  // 2. Elements that are NOT in both arrays (Symmetric Difference)
+  // Returns elements that are in A or B, but not in both
+  symmetricDifference: (arrayA: any[], arrayB: any[]): any[] => {
+    const setA = new Set(arrayA);
+    const setB = new Set(arrayB);
+
+    const inAOnly = [...setA].filter((item) => !setB.has(item));
+    const inBOnly = [...setB].filter((item) => !setA.has(item));
+
+    return [...inAOnly, ...inBOnly];
+  },
+
+  // 3. Elements only in A (Difference: A - B)
+  difference: (arrayA: any[], arrayB: any[]): any[] => {
+    const setB = new Set(arrayB);
+    return [...new Set(arrayA)].filter((item) => !setB.has(item));
+  },
+
+  // 5. Check if A is subset of B
+  isSubset: (arrayA: any[], arrayB: any[]): boolean => {
+    const setB = new Set(arrayB);
+    return [...new Set(arrayA)].every((item) => setB.has(item));
+  },
+
+  // 6. Check if A is superset of B
+  isSuperset: (arrayA: any[], arrayB: any[]): boolean => {
+    const setA = new Set(arrayA);
+    return [...new Set(arrayB)].every((item) => setA.has(item));
   },
 
   // Extract a specific property from each object in array
