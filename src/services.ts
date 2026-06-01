@@ -535,26 +535,52 @@ export const objectLib = {
 
   assign: (...objs: any[]) => Object.assign({}, ...objs),
 
+  // merge: (...objs: Record<string, any>[]) => {
+  //   const out: Record<string, any> = {};
+  //   for (const o of objs) {
+  //     if (o && typeof o === "object") Object.assign(out, o);
+  //   }
+  //   return out;
+  // },
+
   merge: (...objs: Record<string, any>[]) => {
-    const out: Record<string, any> = {};
-    for (const o of objs) {
-      if (o && typeof o === "object") Object.assign(out, o);
-    }
-    return out;
-  },
+    if (objs.length === 0) return {};
+    if (objs.length === 1) return { ...objs[0] };
 
-  collectObject: (obj: Record<string, any>) => {
-    const out: Record<string, any> = {};
+    const mergeTwo = (
+      target: Record<string, any>,
+      source: Record<string, any>,
+    ) => {
+      const result = { ...target };
 
-    for (const k in obj) {
-      const v = obj[k];
+      for (const key in source) {
+        const sourceValue = source[key];
+        const targetValue = target[key];
 
-      if (v !== undefined) {
-        out[k] = v;
+        if (
+          sourceValue &&
+          targetValue &&
+          typeof sourceValue === "object" &&
+          typeof targetValue === "object" &&
+          !Array.isArray(sourceValue)
+        ) {
+          result[key] = mergeTwo(targetValue, sourceValue);
+        } else {
+          result[key] = sourceValue;
+        }
+      }
+
+      return result;
+    };
+
+    let result = { ...objs[0] };
+    for (let i = 1; i < objs.length; i++) {
+      if (objs[i] && typeof objs[i] === "object") {
+        result = mergeTwo(result, objs[i]);
       }
     }
 
-    return out;
+    return result;
   },
 
   pick: (obj: Record<string, any>, keys: string[]) => {
