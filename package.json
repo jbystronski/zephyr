@@ -1,6 +1,6 @@
 {
   "name": "@pogodisco/zephyr",
-  "version": "1.7.32",
+  "version": "1.7.33",
   "publishConfig": {
     "access": "public"
   },
