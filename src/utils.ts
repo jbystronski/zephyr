@@ -1,15 +1,13 @@
-import {
-  arrayLib,
-  dateLib,
-  errLib,
-  extendedJsonLib,
-  logicLib,
-  mathLib,
-  miscLib,
-  objectLib,
-  stdLib,
-  stringLib,
-} from "./services.js";
+import { arrayLib } from "./services/array.js";
+import { stdLib } from "./services/base.js";
+import { dateLib } from "./services/date.js";
+import { errLib } from "./services/error.js";
+import { extendedJsonLib } from "./services/extended-json.js";
+import { logicLib } from "./services/logic.js";
+import { mathLib } from "./services/math.js";
+import { miscLib } from "./services/misc.js";
+import { objectLib } from "./services/object.js";
+import { stringLib } from "./services/string.js";
 import { ServiceMeta, ServiceMetaRegistry, ServiceMetaRule } from "./types.js";
 
 let idCounter = 0;

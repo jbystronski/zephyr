@@ -1,15 +1,13 @@
-import {
-  arrayLib,
-  dateLib,
-  errLib,
-  extendedJsonLib,
-  logicLib,
-  mathLib,
-  miscLib,
-  objectLib,
-  stdLib,
-  stringLib,
-} from "./services.js";
+import { arrayLib } from "./services/array.js";
+import { stdLib } from "./services/base.js";
+import { dateLib } from "./services/date.js";
+import { errLib } from "./services/error.js";
+import { extendedJsonLib } from "./services/extended-json.js";
+import { logicLib } from "./services/logic.js";
+import { mathLib } from "./services/math.js";
+import { miscLib } from "./services/misc.js";
+import { objectLib } from "./services/object.js";
+import { stringLib } from "./services/string.js";
 import { DEPS, EXEC_GRAPH, MODULE_ID } from "./symbols.js";
 
 export type WorkflowDef<Input, Output = undefined> = {
@@ -140,6 +138,33 @@ export type StandardServices = {
   misc: typeof miscLib;
   extended_json: typeof extendedJsonLib;
   err: typeof errLib;
+};
+
+export type IRStepResolve = {
+  __service?: string;
+  __method?: string;
+  __ref?: number;
+  __path?: string[];
+  __args?: (IRStepResolve | Primitive)[];
+  [x: string]: any;
+};
+
+export type IRStep = {
+  id: string;
+  idx: number;
+  resolve: IRStepResolve;
+  dependsOn: number[];
+  guards: number[];
+  options?: StepOptions;
+};
+export type IR = {
+  __id: string;
+  name: string;
+  steps: IRStep[];
+  guards: number[];
+  endSteps: IRStep[];
+  outputIdx?: number;
+  initIdx?: number;
 };
 
 export type ServiceParams<
