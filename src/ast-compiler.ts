@@ -8,9 +8,10 @@ import {
   ExecutionPlan,
   Expr,
   ResultsArray,
+  StepDef,
   StepExecutor,
+  WorkflowDef,
 } from "./types.js";
-import { StepDef, WorkflowDef } from "./workflow-composer.js";
 
 export function readResult(results: ResultsArray, idx: number): any {
   let current: ResultsArray = results;
@@ -154,10 +155,7 @@ function generateExprCode(
   throw new Error("Unknown expr");
 }
 
-function createStepExecutor(
-  step: StepDef<any>,
-  ctx: CompilerCtx,
-): StepExecutor {
+function createStepExecutor(step: StepDef, ctx: CompilerCtx): StepExecutor {
   if (!step.resolve) {
     return () => undefined;
   }
@@ -179,10 +177,7 @@ function createStepExecutor(
   return (rt) => compiled(rt, readResult);
 }
 
-export function compileStep(
-  step: StepDef<any>,
-  ctx: CompilerCtx,
-): CompiledStep {
+export function compileStep(step: StepDef, ctx: CompilerCtx): CompiledStep {
   return {
     id: step.id,
     idx: step.idx,

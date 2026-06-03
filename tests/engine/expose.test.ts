@@ -13,7 +13,10 @@ import {
 const createMod = createModule<StandardServices>();
 
 const child = createMod(({ wf }) => {
-  const childWfOne = wf<{ a: number; b: number }>("one")
+  const childWfOne = wf<
+    { a: number; b: number },
+    { ["one_init"]: any; add: any }
+  >("one")
     .init("one_init")
     .seq("add", (ctx) =>
       ctx.math.add(ctx.get("one_init").a, ctx.get("one_init").b),
@@ -25,7 +28,7 @@ const child = createMod(({ wf }) => {
 });
 
 const parent = createMod(({ wf }) => {
-  const test = wf("test")
+  const test = wf<null, { result: any }>("test")
     .sub("result", child.childWfOne, () => ({ a: 10, b: 10 }))
     .output((ctx) => ctx.get("result"));
 

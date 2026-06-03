@@ -20,7 +20,7 @@ describe("Parallel execution", () => {
     calls.length = 0;
 
     const mod = createModule<typeof local>()(({ wf }) => ({
-      test: wf("parllel-test")
+      test: wf<null, { a: any; b: any; c: any }>("parllel-test")
         .par(
           (b) => b.seq("a", (_) => _.actions.a()),
           (b) => b.seq("b", (_) => _.actions.b()),
@@ -31,7 +31,7 @@ describe("Parallel execution", () => {
     }));
 
     const rt = createRuntime({ services: local });
-    await rt.run(mod.test, {});
+    await rt.run(mod.test, null);
 
     expect(calls.sort()).toEqual(["A", "B", "C"]);
   });

@@ -29,7 +29,10 @@ const meta = createMeta<typeof services>()
 const mod = createModule<StandardServices & { pay: typeof payService }>();
 
 const A = mod(({ wf }) => ({
-  pay: wf("pay")
+  pay: wf<
+    null,
+    { ["pay async direct"]: any; ["pay async nested"]: any; ["pay sync"]: any }
+  >("pay")
     .seq("pay async direct", (_) => _.pay.charge(33))
     .seq("pay async nested", (_) => ({
       charged: _.pay.charge(44),
@@ -51,7 +54,7 @@ describe("Sync vs Async methods", () => {
   it("should correctly resolve sync call, async call (nested and direct)", async () => {
     const root = createRuntime({ services, meta });
 
-    const a = await root.run(A.pay, {});
+    const a = await root.run(A.pay, null);
 
     expect(a.output).toEqual({
       a: 33,

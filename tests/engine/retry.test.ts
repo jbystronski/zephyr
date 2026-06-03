@@ -28,7 +28,7 @@ describe("Retry handling at action level", () => {
 
     // Child workflow with retry on the action itself
     const child = createMod(({ wf }) => {
-      const failStep = wf<{ a: number; b: number }>("failStep")
+      const failStep = wf<{ a: number; b: number }, any>("failStep")
         .init("failInit")
         .seq(
           "subAdd",
@@ -44,7 +44,7 @@ describe("Retry handling at action level", () => {
 
     // Parent workflow
     const parent = createMod(({ wf }) => {
-      const test = wf<{ x: number; y: number }>("test")
+      const test = wf<{ x: number; y: number }, any>("test")
         .init("test_init")
         .seq(
           "a",

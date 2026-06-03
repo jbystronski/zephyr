@@ -1,6 +1,6 @@
 import { StepDef } from "./types.js";
 
-export function buildLevels(steps: StepDef<any>[]): StepDef<any>[][] {
+export function buildLevels(steps: StepDef[]): StepDef[][] {
   const remainingDeps = new Map<number, number>();
   const dependents = new Map<number, number[]>();
   const ready: number[] = [];
@@ -34,14 +34,14 @@ export function buildLevels(steps: StepDef<any>[]): StepDef<any>[][] {
   // TOPO WALK
   // -----------------------------------
 
-  const levels: StepDef<any>[][] = [];
+  const levels: StepDef[][] = [];
 
   while (ready.length > 0) {
     const batch = ready.splice(0);
 
     // IMPORTANT:
     // remove joins from runtime levels
-    const runtimeBatch: StepDef<any>[] = [];
+    const runtimeBatch: StepDef[] = [];
 
     for (const idx of batch) {
       const step = stepByIdx.get(idx)!;

@@ -20,21 +20,21 @@ type PayService = {
 const mod = createModule<StandardServices & { stripe: PayService["stripe"] }>();
 
 const deepChildSecond = mod(({ wf }) => ({
-  deepChildActionSecond: wf<{ init: string }>("deepChildActionSecond")
+  deepChildActionSecond: wf<{ init: string }, any>("deepChildActionSecond")
     .init("init")
     .seq("actionSecond", (ctx) => ctx.string.upper(ctx.get("init").init))
     .output((ctx) => ({ deepRes: ctx.get("actionSecond") })),
 }));
 
 const deepChild = mod(({ wf }) => ({
-  deepChildAction: wf<{ init: string }>("deepChildAction")
+  deepChildAction: wf<{ init: string }, any>("deepChildAction")
     .init("d2_init")
     .seq("action", (ctx) => ctx.string.upper(ctx.get("d2_init").init))
     .output((ctx) => ({ deepRes: ctx.get("action") })),
 }));
 
 const child = mod(({ wf }) => ({
-  sum: wf<{ a: number; b: number }>("sum")
+  sum: wf<{ a: number; b: number }, any>("sum")
     .init("d3_init")
     .seq("add", (ctx) =>
       ctx.math.add(ctx.get("d3_init").a, ctx.get("d3_init").b),
@@ -48,7 +48,7 @@ const child = mod(({ wf }) => ({
 // type T = DepWorkflows<{ child: typeof child }>;
 
 const parent = mod(({ wf }) => {
-  const test = wf("test")
+  const test = wf<any, any>("test")
     .sub("deepAction", child.deepAction, () => ({ init: "abc" }))
     .sub("result", child.sum, () => ({ a: 2, b: 3 }))
     .output((ctx) => ctx.get("result"));

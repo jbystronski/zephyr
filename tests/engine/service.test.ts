@@ -14,13 +14,13 @@ type PayService = {
 const mod = createModule<StandardServices & { stripe: PayService["stripe"] }>();
 
 const subchild = mod(({ wf }) => ({
-  loc: wf("loc")
+  loc: wf<any, any>("loc")
     .seq("a", (ctx) => ctx.math.add(2, 2))
     .output((ctx) => ctx.get("a")),
 }));
 
 const child = mod(({ wf }) => {
-  const pay = wf<{ amount: number }>("payment")
+  const pay = wf<{ amount: number }, any>("payment")
     .init("pay_init")
     .seq("payment", (ctx) => ctx.stripe.charge(ctx.get("pay_init").amount))
 
@@ -30,20 +30,20 @@ const child = mod(({ wf }) => {
 });
 
 const local = mod(({ wf }) => ({
-  st: wf("st")
+  st: wf<any, any>("st")
     .seq("st", (ctx) => ctx.stripe.charge(333))
     .build(),
-  localOne: wf<{ input: boolean }>("macro_1")
+  localOne: wf<{ input: boolean }, any>("macro_1")
     .seq("add", (ctx) => ctx.math.add(2, 3))
     .output((ctx) => ctx.get("add")),
-  localTwo: wf("macro_2")
+  localTwo: wf<any, any>("macro_2")
     // .init("i")
     .seq("adding 2 and 3", (ctx) => ctx.math.add(2, 3))
     .output((ctx) => ctx.get("adding 2 and 3")),
 }));
 
 const parent = mod(({ wf }) => {
-  const test = wf("test")
+  const test = wf<any, any>("test")
     .init("i")
     .sub("macro", local.localTwo, () => ({}))
     .sub("result", child.pay, () => ({

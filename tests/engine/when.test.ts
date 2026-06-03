@@ -10,7 +10,7 @@ import {
 import { createModule } from "../../src/workflow-module";
 
 const mod = createModule<StandardServices>()(({ wf }) => ({
-  a: wf<{ input: number }>("a")
+  a: wf<{ input: number }, any>("a")
     .init("a")
     .seq("step1", (ctx) => ctx.math.add(ctx.get("a").input, 3))
     .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2))
@@ -30,7 +30,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       c: ctx.get("step4"),
     })),
 
-  b: wf<{ input: number }>("b")
+  b: wf<{ input: number }, any>("b")
     .init("b")
     .seq("step1", (c) => c.math.add(c.get("b").input, 3))
     .seq("step2", (c) => c.math.mul(c.get("step1"), 2))
@@ -52,7 +52,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       d: get("step5"),
     })),
 
-  c: wf<{ input: number }>("c")
+  c: wf<{ input: number }, any>("c")
     .init("c")
     .seq("step1", (ctx) => ctx.math.add(ctx.get("c").input, 3)) // 3 + 3 = 6
     .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 6 * 2 = 12
@@ -63,20 +63,11 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       (b) =>
         b
           .par(
-            (b0) =>
-              b0
-                .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1)) // 13
-                .as<number | undefined>(),
+            (b0) => b0.seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1)),
 
-            (b1) =>
-              b1
-                .seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2)) // 14
-                .as<number | undefined>(),
+            (b1) => b1.seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2)), // 14
 
-            (b2) =>
-              b2
-                .seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)) // 15
-                .as<number | undefined>(),
+            (b2) => b2.seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)), // 15
           )
           .join(),
     )
@@ -88,7 +79,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       p2: get("p2"),
     })),
 
-  d: wf<{ input: number }>("d")
+  d: wf<{ input: number }, any>("d")
     .init("d")
     .seq("step1", (ctx) => ctx.math.add(ctx.get("d").input, 3)) // 6
     .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 12
@@ -99,20 +90,11 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       (b) =>
         b
           .par(
-            (b0) =>
-              b0
-                .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1))
-                .as<number | undefined>(),
+            (b0) => b0.seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1)),
 
-            (b1) =>
-              b1
-                .seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2))
-                .as<number | undefined>(),
+            (b1) => b1.seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2)),
 
-            (b2) =>
-              b2
-                .seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3))
-                .as<number | undefined>(),
+            (b2) => b2.seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)),
           )
 
           .join(),
@@ -125,7 +107,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       p2: get("p2"),
     })),
 
-  e: wf<{ input: number }>("e")
+  e: wf<{ input: number }, any>("e")
     .init("e")
     .seq("step1", (ctx) => ctx.math.add(ctx.get("e").input, 3)) // 3 + 3 = 6
     .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 6 * 2 = 12
@@ -150,10 +132,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       // .endWhen(),
 
       // ✅ always runs
-      (b2) =>
-        b2
-          .seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)) // 15
-          .as<number | undefined>(),
+      (b2) => b2.seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)), // 15
     )
 
     .join()
@@ -165,7 +144,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       p2: get("p2"),
     })),
 
-  g: wf<{ input: number }>("g")
+  g: wf<{ input: number }, any>("g")
     .init("g")
     .seq("step1", (ctx) => ctx.math.add(ctx.get("g").input, 3)) // 6
     .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 12
@@ -193,10 +172,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
             ),
 
           // ✅ no inner condition → inherits parent → runs
-          (b2) =>
-            b2
-              .seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)) // 15
-              .as<number | undefined>(),
+          (b2) => b2.seq("p2", (ctx) => ctx.math.add(ctx.get("step2"), 3)), // 15
         ),
     )
 
@@ -209,7 +185,7 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       p2: _("p2"),
     })),
 
-  h: wf<{ input: number }>("h")
+  h: wf<{ input: number }, any>("h")
     .init("h")
     .seq("step1", (ctx) => ctx.math.add(ctx.get("h").input, 3)) // 6
     .seq("step2", (ctx) => ctx.math.mul(ctx.get("step1"), 2)) // 12
@@ -221,15 +197,9 @@ const mod = createModule<StandardServices>()(({ wf }) => ({
       (b) =>
         b
           .par(
-            (b0) =>
-              b0
-                .seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1))
-                .as<number | undefined>(),
+            (b0) => b0.seq("p0", (ctx) => ctx.math.add(ctx.get("step2"), 1)),
 
-            (b1) =>
-              b1
-                .seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2))
-                .as<number | undefined>(),
+            (b1) => b1.seq("p1", (ctx) => ctx.math.add(ctx.get("step2"), 2)),
           )
           .join(),
     )
@@ -316,7 +286,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
 
     const createMod = createModule<StandardServices>();
     const child = createMod(({ wf }) => ({
-      sum: wf<{ a: number; b: number }>("sum")
+      sum: wf<{ a: number; b: number }, any>("sum")
         .init("sum")
         .seq("add", (ctx) => {
           executed = true; // 🔥 detect execution
@@ -326,7 +296,7 @@ describe("Workflow engine - parallel with independent when per branch", () => {
     }));
 
     const parent = createMod(({ wf }) => ({
-      test: wf("test")
+      test: wf<any, any>("test")
         .if(
           "true equals false",
           (ctx) => ctx.logic.eq(true, false),

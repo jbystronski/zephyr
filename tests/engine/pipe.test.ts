@@ -70,9 +70,15 @@ const createMod = createModule<
 >();
 
 const testPipe = createMod(({ wf }) => {
-  const findFirstArcticBird = wf<{ data: Transformable[] }>(
-    "firstArcticBirdTest",
-  )
+  const findFirstArcticBird = wf<
+    { data: Transformable[] },
+    {
+      i: any;
+      firstArctictBird: Transformable | undefined;
+      animal: Transformable;
+      first: boolean;
+    }
+  >("firstArcticBirdTest")
     .init("i")
     .pipe(
       "firstArctictBird",
@@ -90,7 +96,15 @@ const testPipe = createMod(({ wf }) => {
     )
     .output(({ get }) => get("firstArctictBird"));
 
-  const someAreTropical = wf<{ data: Transformable[] }>("someAreTropical")
+  const someAreTropical = wf<
+    { data: Transformable[] },
+    {
+      i: { data: Transformable[] };
+      someAreTropical: boolean;
+      animal: Transformable;
+      first: boolean;
+    }
+  >("someAreTropical")
     .init("i")
     .pipe(
       "someAreTropical",
@@ -105,7 +119,10 @@ const testPipe = createMod(({ wf }) => {
     )
     .output(({ get }) => get("someAreTropical"));
 
-  const everyIsArctic = wf<{ data: Transformable[] }>("everyIsArctic")
+  const everyIsArctic = wf<
+    { data: Transformable[] },
+    { i: any; everyIsArctic: any; animal: Transformable; first: any }
+  >("everyIsArctic")
     .init("i")
     .pipe(
       "everyIsArctic",
@@ -120,7 +137,10 @@ const testPipe = createMod(({ wf }) => {
     )
     .output(({ get }) => get("everyIsArctic"));
 
-  const reptilesOnly = wf<{ data: Transformable[] }>("reptilesOnly")
+  const reptilesOnly = wf<
+    { data: Transformable[] },
+    { i: any; reptilesOnly: any; animal: any; first: any }
+  >("reptilesOnly")
     .init("i")
     .pipe(
       "reptilesOnly",
@@ -135,7 +155,19 @@ const testPipe = createMod(({ wf }) => {
     )
     .output(({ get }) => get("reptilesOnly"));
 
-  const test = wf<{ elements: string[]; another: string }>("pipeElements")
+  const test = wf<
+    { elements: string[]; another: string },
+    {
+      init: any;
+      add_animal: any;
+      pv2: any;
+      pv2_init: any;
+      upp: any;
+      pref: any;
+      suffix: any;
+      enrich: any;
+    }
+  >("pipeElements")
     .init("init")
     .seq("add_animal", (_) =>
       _.s1.addAnimal({
@@ -159,7 +191,7 @@ const testPipe = createMod(({ wf }) => {
           ),
     )
 
-    .output(({ get }) => get("pv2"));
+    .output((_) => _.get("pv2"));
 
   return {
     test,

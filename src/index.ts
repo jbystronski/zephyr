@@ -1,10 +1,9 @@
-export * from "./event-stream.js";
+export { eventStream } from "./event-stream.js";
 
-export * from "./workflow-composer.js";
-export * from "./workflow-module.js";
-export * from "./build-levels.js";
+export { createWorkflow } from "./workflow-composer.js";
+export { createModule } from "./workflow-module.js";
 
-export * from "./runtime.js";
+export { createRuntime } from "./runtime.js";
 export { createServices, createMeta, baseServices } from "./utils.js";
 
 export * from "./types.js";
@@ -20,5 +19,4 @@ export { miscLib } from "./services/misc.js";
 export { extendedJsonLib } from "./services/extended-json.js";
 export { errLib } from "./services/error.js";
 
-export * from "./ast.js";
 export { useMetrics, useLog } from "./observer.js";

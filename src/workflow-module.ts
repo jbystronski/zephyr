@@ -1,6 +1,6 @@
-import { Module, ServiceRegistry } from "./types.js";
+import { Module, ServiceRegistry, WorkflowDef } from "./types.js";
 
-import { createWorkflow, WorkflowDef } from "./workflow-composer.js";
+import { createWorkflow } from "./workflow-composer.js";
 
 export function createModule<S extends ServiceRegistry>() {
   const wf = createWorkflow<S>();

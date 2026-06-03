@@ -7,6 +7,7 @@ import {
   eventStream,
   StandardServices,
   useLog,
+  WorkflowOutput,
 } from "../../src";
 
 eventStream.subscribe((ev: any) => {
@@ -26,28 +27,44 @@ type ExplorerObject = {
 const mod = createModule<StandardServices>();
 
 const modB = mod(({ wf }) => ({
-  createExplorerObject: wf<{ key: string; parent?: ExplorerObject }>(
-    "create explorer object",
-  )
+  createExplorerObject: wf<
+    { key: string; parent?: ExplorerObject },
+    {
+      i: { key: string; parent?: ExplorerObject };
+      ["type of object"]: "branch" | "root";
+      created: ExplorerObject;
+    }
+  >("create explorer object")
     .init("i")
     .seq("type of object", ({ std, get }) =>
       std.if(get("i").parent, "branch", "root"),
     )
-    .seq("created", ({ std, get }) =>
-      std.const({
-        label: get("i").key,
-        parent: get("i").parent,
-        type: get("type of object"),
-        raw: {
-          name: get("i").key,
-          kind: "bucket",
-        },
-      }),
+    .seq(
+      "created",
+      ({ std, get }) =>
+        ({
+          label: get("i").key,
+          parent: get("i").parent,
+          type: get("type of object"),
+          raw: {
+            name: get("i").key,
+            kind: "bucket",
+          },
+        }) satisfies ExplorerObject,
     )
-    .as<ExplorerObject>()
+
     .output(({ get }) => get("created")),
 
-  findObject: wf<{ data: ExplorerObject[]; key: string }>("find obejct")
+  findObject: wf<
+    { data: ExplorerObject[]; key: string },
+    {
+      i: { data: ExplorerObject[]; key: string };
+      ["has key"]: boolean;
+      ["find pipe"]: ExplorerObject | undefined;
+      item: ExplorerObject;
+      ["match label"]: boolean;
+    }
+  >("find obejct")
     .init("i")
     .if(
       "has key",
@@ -69,9 +86,10 @@ const modB = mod(({ wf }) => ({
 }));
 
 const modA = mod(({ wf }) => ({
-  createObjects: wf<{ initData: { label: string; kind: string }[] }>(
-    "create objects",
-  )
+  createObjects: wf<
+    { initData: { label: string; kind: string }[] },
+    { i: any; ["p 1"]: any; item: any }
+  >("create objects")
     .init("i")
     .pipe(
       "p 1",
@@ -84,7 +102,7 @@ const modA = mod(({ wf }) => ({
             key: get("item").label,
           })),
     )
-    .as<ExplorerObject[]>()
+
     .output(({ get }) => ({
       objects: get("p 1"),
     })),
@@ -92,15 +110,25 @@ const modA = mod(({ wf }) => ({
 }));
 
 const modC = mod(({ wf }) => ({
-  accessChained: wf<{ nestedObject: { foo: { bar: string } } }>("access chain")
+  accessChained: wf<
+    { nestedObject: { foo: { bar: string } } },
+    { i: any; extract: any }
+  >("access chain")
     .init("i")
     .seq("extract", (_) => _.object.get(_.get("i").nestedObject, "foo").bar)
     .output((_) => _.get("extract")),
 
-  createObjectsAndFind: wf<{
-    keyToFind: string;
-    initData: { label: string; kind: string }[];
-  }>("create object and find by key")
+  createObjectsAndFind: wf<
+    {
+      keyToFind: string;
+      initData: { label: string; kind: string }[];
+    },
+    {
+      i: any;
+      ["created objects"]: any;
+      find: WorkflowOutput<typeof modA.findObject>;
+    }
+  >("create object and find by key")
     .init("i")
     .sub("created objects", modA.createObjects, ({ get }) => ({
       initData: get("i").initData,

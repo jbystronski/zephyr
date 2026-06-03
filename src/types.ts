@@ -14,16 +14,21 @@ export type WorkflowDef<Input, Output = undefined> = {
   name?: string;
   __id: string;
   __stack: string[];
-  steps: StepDef<any>[];
-  endSteps: StepDef<any>[];
+  steps: StepDef[];
+  endSteps: StepDef[];
   outputIdx?: number;
   initIdx?: number;
   guards: number[];
 };
 
-export type WFConfig<Input, Services> = {
+export type StepKey = string;
+
+export type StepSchema = Record<string, any>;
+
+export type WFConfig<Input, Services, Schema> = {
   input: Input;
   services: Services;
+  schema: Schema;
 };
 
 export type PipeResult<Mode extends PipeMode, Item> = Mode extends "map"
@@ -44,12 +49,12 @@ export type PipeNode = {
   workflow: {
     __id: string;
 
-    steps: StepDef<any>[];
+    steps: StepDef[];
 
     //TODO: add guards here?
     // guards: number[]
 
-    endSteps: StepDef<any>[];
+    endSteps: StepDef[];
   };
 
   exitMap: number[];
@@ -68,8 +73,8 @@ type StepCtx<R> = {
   results: R;
 };
 
-export type StepDef<ID extends string = string> = {
-  id: ID;
+export type StepDef = {
+  id: string;
   idx: number;
   dependsOn: number[];
   guards?: number[];
