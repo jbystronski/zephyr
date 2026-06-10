@@ -1,4 +1,3 @@
-import { readResult } from "./ast-compiler.js";
 import { composeObserver } from "./observer.js";
 import { UNSET } from "./symbols.js";
 import {
@@ -6,7 +5,6 @@ import {
   ExecutionFrame,
   ExecutionPlan,
   PipeMode,
-  ResultsArray,
   StepRuntimeCtx,
   WorkflowObserver,
 } from "./types.js";
@@ -35,7 +33,7 @@ function createFastExecutor(
   plan: ExecutionPlan,
   services: Record<string, any>,
 ) {
-  return async function executePlanFast(results: ResultsArray) {
+  return async function executePlanFast(results: any[]) {
     const rt = {
       services,
       results,
@@ -57,42 +55,9 @@ function createFastExecutor(
       );
     }
 
-    return results[plan.outputIndex ?? plan.exitIndexes?.[0] ?? 0];
+    return results[plan.outputIndex!];
   };
 }
-
-// async function executeStepWithOptions(step: CompiledStep, rt: StepRuntimeCtx) {
-//   const opts = step.options;
-//
-//   const run = () => executeStep(step, rt);
-//
-//   try {
-//     let execution = run();
-//
-//     if (opts?.timeout) {
-//       execution = withTimeout(execution, opts.timeout);
-//     }
-//
-//     if (opts?.retry) {
-//       execution = runWithRetry(() => execution, {
-//         retry: opts.retry.count,
-//         retryDelay: opts.retry.delay,
-//       });
-//     }
-//
-//     return await execution;
-//   } catch (err) {
-//     if (opts?.fallback !== undefined) {
-//       return opts.fallback;
-//     }
-//
-//     if (opts?.swallow === true) {
-//       return undefined;
-//     }
-//
-//     throw err;
-//   }
-// }
 
 async function executeStepWithOptions(step: CompiledStep, rt: StepRuntimeCtx) {
   const opts = step.options;
@@ -137,7 +102,7 @@ function createObservedExecutor(
   const observerFn = composeObserver(observers);
 
   return async function executePlanObserved(
-    results: ResultsArray,
+    results: any[],
     extras: Record<string, unknown>,
   ) {
     const rootRt = {
@@ -201,74 +166,59 @@ function createObservedExecutor(
       );
     }
 
-    return results[plan.outputIndex ?? plan.exitIndexes?.[0] ?? 0];
+    return results[plan.outputIndex!];
   };
-}
-
-async function runPipeWorkflow(
-  plan: ExecutionPlan,
-  input: any,
-  rt: StepRuntimeCtx,
-) {
-  const results = new Array(plan.maxIndex + 1) as ResultsArray;
-  // results.fill(UNSET);
-
-  results.__parent = rt.results;
-
-  if (typeof plan.initIdx === "number") {
-    results[plan.initIdx] = input;
-  }
-
-  const rtBase: StepRuntimeCtx = {
-    services: rt.services,
-    results,
-    observers: rt.observers,
-    frame: undefined,
-  };
-
-  for (const level of plan.levels) {
-    await Promise.all(
-      level.map(async (step) => {
-        if (!checkGuards(step.guards, rtBase)) {
-          results[step.idx] = undefined;
-          return;
-        }
-
-        const rt: StepRuntimeCtx = {
-          ...rtBase,
-          frame: undefined,
-        };
-
-        if (results[step.idx] === undefined) {
-          results[step.idx] = await executeStepWithOptions(step, rt);
-        }
-      }),
-    );
-  }
-
-  return results[plan.outputIndex ?? plan.exitIndexes?.[0] ?? 0];
 }
 
 async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
+  if (step?.spec === "__sub__") {
+    const input = step.resolve ? await step.resolve(rt) : null;
+    const exec = createExecutor(step.plan!, rt.services, rt.observers);
+
+    const results = new Array(step.plan!.maxIndex + 1);
+
+    if (typeof step.plan?.initIdx === "number") {
+      results[step.plan.initIdx] = input;
+    }
+
+    return exec(results, {});
+  }
+
   if (step?.spec === "__pipe__") {
-    const items = step.resolve ? await step.resolve(rt) : [];
+    const { items, ...rest } = step.resolve ? await step.resolve(rt) : null;
     const list = Array.isArray(items) ? items : [];
 
-    let mode: PipeMode = step.pipe?.mode ?? "map";
+    const plan = step?.plan!;
+    const initIdx = plan.initIdx;
+    const maxIndex = plan.maxIndex;
+
+    const exec = createExecutor(plan!, rt.services, rt.observers);
+
+    let mode: PipeMode = step?.pipeMode ?? "map";
+
+    const iterate = (item: any) => {
+      const results = new Array(maxIndex + 1);
+
+      if (typeof initIdx === "number") {
+        results[initIdx] = { item, ...rest };
+      }
+
+      return exec(results, {});
+    };
 
     switch (mode) {
       case "map":
-        const res = await Promise.all(
-          list.map((item, i) => runPipeWorkflow(step.pipe?.plan!, item, rt)),
+        return Promise.all(
+          list.map(async (item) => {
+            return iterate(item);
+          }),
         );
-
-        return res;
 
       case "filter": {
         const res = [];
 
         for (let i = 0; i < list.length; i++) {
-          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+          const out = await iterate(list[i]);
 
           if (out) {
             res.push(list[i]);
@@ -279,7 +229,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
       }
       case "find": {
         for (let i = 0; i < list.length; i++) {
-          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+          const out = await iterate(list[i]);
 
           if (out) {
             return list[i];
@@ -291,7 +241,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
 
       case "some": {
         for (let i = 0; i < list.length; i++) {
-          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+          const out = await iterate(list[i]);
 
           if (out) {
             return true;
@@ -303,7 +253,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
 
       case "every": {
         for (let i = 0; i < list.length; i++) {
-          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+          const out = await iterate(list[i]);
 
           if (!out) {
             return false;
@@ -317,7 +267,7 @@ async function executeStep(step: CompiledStep, rt: StepRuntimeCtx) {
         let count = 0;
 
         for (let i = 0; i < list.length; i++) {
-          const out = await runPipeWorkflow(step.pipe?.plan!, list[i], rt);
+          const out = await iterate(list[i]);
 
           if (out) count++;
         }
@@ -336,7 +286,7 @@ function checkGuards(guards: number[] | undefined, rt: StepRuntimeCtx) {
   }
 
   for (const ref of guards) {
-    const res = readResult(rt.results, ref);
+    const res = rt.results[ref];
 
     if (res === undefined) {
       throw new Error(`Unknown guard ref: ${ref}`);

@@ -1,6 +1,7 @@
 export const stdLib = {
   // --- control ---
   if: (cond: any, a: any, b: any) => (cond ? a : b),
+  has: (cond: any, a: any, b: any) => (cond ? a : b),
   coalesce: (...values: any[]) => {
     for (const v of values) {
       if (v !== undefined && v !== null) {

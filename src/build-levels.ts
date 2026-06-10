@@ -7,10 +7,7 @@ export function buildLevels(steps: StepDef[]): StepDef[][] {
 
   const stepByIdx = new Map(steps.map((s) => [s.idx, s]));
 
-  // -----------------------------------
   // BUILD GRAPH
-  // -----------------------------------
-
   for (const step of steps) {
     remainingDeps.set(step.idx, step.dependsOn.length);
 
@@ -19,52 +16,38 @@ export function buildLevels(steps: StepDef[]): StepDef[][] {
     }
 
     for (const dep of step.dependsOn) {
+      if (dep === undefined || dep === null) continue; // Handle undefined deps
       let arr = dependents.get(dep);
-
       if (!arr) {
         arr = [];
         dependents.set(dep, arr);
       }
-
       arr.push(step.idx);
     }
   }
 
-  // -----------------------------------
   // TOPO WALK
-  // -----------------------------------
-
   const levels: StepDef[][] = [];
 
   while (ready.length > 0) {
     const batch = ready.splice(0);
 
-    // IMPORTANT:
-    // remove joins from runtime levels
-    const runtimeBatch: StepDef[] = [];
-
+    // Collect steps for this level
+    const currentLevel: StepDef[] = [];
     for (const idx of batch) {
       const step = stepByIdx.get(idx)!;
-
-      // prune join from runtime execution
-      if (step.spec !== "__join__") {
-        runtimeBatch.push(step);
-      }
+      currentLevel.push(step);
     }
 
-    // only emit non-empty runtime levels
-    if (runtimeBatch.length > 0) {
-      levels.push(runtimeBatch);
+    if (currentLevel.length > 0) {
+      levels.push(currentLevel);
     }
 
-    // STILL PROCESS DEPENDENTS
-    // joins still participate structurally
+    // Process dependents
     for (const idx of batch) {
       for (const child of dependents.get(idx) ?? []) {
         const left = remainingDeps.get(child)! - 1;
-
         remainingDeps.set(child, left);
-
         if (left === 0) {
           ready.push(child);
         }

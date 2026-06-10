@@ -10,12 +10,10 @@ import { objectLib } from "./services/object.js";
 import { stringLib } from "./services/string.js";
 import { DEPS, EXEC_GRAPH, MODULE_ID } from "./symbols.js";
 
-export type WorkflowDef<Input, Output = undefined> = {
-  name?: string;
+export type WorkflowDef<I, O> = {
   __id: string;
   __stack: string[];
   steps: StepDef[];
-  endSteps: StepDef[];
   outputIdx?: number;
   initIdx?: number;
   guards: number[];
@@ -24,41 +22,6 @@ export type WorkflowDef<Input, Output = undefined> = {
 export type StepKey = string;
 
 export type StepSchema = Record<string, any>;
-
-export type WFConfig<Input, Services, Schema> = {
-  input: Input;
-  services: Services;
-  schema: Schema;
-};
-
-export type PipeResult<Mode extends PipeMode, Item> = Mode extends "map"
-  ? Item[]
-  : Mode extends "filter"
-    ? Item[]
-    : Mode extends "find"
-      ? Item | undefined
-      : Mode extends "some" | "every"
-        ? boolean
-        : Mode extends "count"
-          ? number
-          : never;
-
-export type PipeNode = {
-  mode: PipeMode;
-
-  workflow: {
-    __id: string;
-
-    steps: StepDef[];
-
-    //TODO: add guards here?
-    // guards: number[]
-
-    endSteps: StepDef[];
-  };
-
-  exitMap: number[];
-};
 
 export type WorkflowInput<T> = T extends WorkflowDef<infer I, any> ? I : never;
 
@@ -69,20 +32,16 @@ export type WorkflowOutput<T> =
       : O
     : undefined;
 
-type StepCtx<R> = {
-  results: R;
-};
-
 export type StepDef = {
   id: string;
   idx: number;
   dependsOn: number[];
   guards?: number[];
-
   resolve: Expr;
   options?: StepOptions;
   spec?: StepSpec;
-  pipe?: PipeNode;
+  pipeMode?: PipeMode;
+  ast?: WorkflowDef<any, any>;
 };
 
 export type StepOptions = {
@@ -108,10 +67,6 @@ export type StepOptions = {
     limit?: number;
   };
 };
-
-export type Simplify<T> = {
-  [K in keyof T]: T[K];
-} & {};
 
 export type WorkflowObserver = {
   (
@@ -145,33 +100,6 @@ export type StandardServices = {
   err: typeof errLib;
 };
 
-export type IRStepResolve = {
-  __service?: string;
-  __method?: string;
-  __ref?: number;
-  __path?: string[];
-  __args?: (IRStepResolve | Primitive)[];
-  [x: string]: any;
-};
-
-export type IRStep = {
-  id: string;
-  idx: number;
-  resolve: IRStepResolve;
-  dependsOn: number[];
-  guards: number[];
-  options?: StepOptions;
-};
-export type IR = {
-  __id: string;
-  name: string;
-  steps: IRStep[];
-  guards: number[];
-  endSteps: IRStep[];
-  outputIdx?: number;
-  initIdx?: number;
-};
-
 export type ServiceParams<
   S extends ServiceRegistry,
   K extends keyof S,
@@ -203,12 +131,7 @@ export type ServiceMetaRegistry<S extends Record<string, any>> = {
   };
 };
 
-export type StepSpec =
-  | "__init__"
-  | "__eval__"
-  | "__out__"
-  | "__pipe__"
-  | "__join__";
+export type StepSpec = "__pipe__" | "__sub__";
 
 export type PipeMode = "map" | "filter" | "find" | "some" | "every" | "count";
 
@@ -239,26 +162,6 @@ export type CallExpr = {
   __path?: PropertyKey[];
 };
 
-export type ExprValue<T> = T & {
-  __expr: Expr;
-};
-
-export type GetterProxy<T> = T & {
-  __expr: Expr;
-};
-
-export type ExprServiceCtx<S extends ServiceRegistry> = {
-  [SK in keyof S]: {
-    [MK in keyof S[SK]]: (
-      ...args: Parameters<S[SK][MK]>
-    ) => ExprValue<Awaited<ReturnType<S[SK][MK]>>>;
-  };
-};
-
-export type ExprCtx<S extends ServiceRegistry, Results> = ExprServiceCtx<S> & {
-  get<K extends keyof Results>(key: K): Results[K];
-};
-
 // -----------------------------------
 // Compiler / Executor
 // -----------------------------------
@@ -276,13 +179,11 @@ export type CompilerCtx<M = any> = {
   meta: M;
 };
 
-export type ResultsArray = any[] & { __parent?: ResultsArray };
-
 export type ExecutionPlan = {
   initIdx?: number;
   levels: CompiledStep[][];
   outputIndex?: number;
-  exitIndexes: number[];
+
   maxIndex: number;
 };
 
@@ -294,26 +195,16 @@ export type CompiledStep = {
   options?: StepOptions;
   spec?: StepSpec;
   resolve: StepExecutor | null;
-  pipe?: {
-    mode: PipeMode;
-    plan: ExecutionPlan;
-  };
+  pipeMode?: PipeMode;
+  plan?: ExecutionPlan;
 };
 
 export type StepRuntimeCtx = {
   services: Record<string, unknown>;
-  results: ResultsArray;
+  results: any[];
   observers: any[];
   frame?: ExecutionFrame;
 };
-
-export type CompiledStepRuntime = (ctx: StepRuntimeCtx) => Promise<any>;
-
-export type CompiledExpr =
-  | any
-  | CompiledExpr[]
-  | Record<string, any>
-  | ((rt: StepRuntimeCtx) => any | Promise<any>);
 
 export type StepExecutor = (rt: StepRuntimeCtx) => any;
 
@@ -329,19 +220,3 @@ export type RuntimeOptions = {
     options: AvailableOpts;
   };
 };
-
-export type Runtime = {
-  run<WF extends WorkflowDef<any, any>>(
-    wf: WF,
-
-    input: WorkflowInput<WF>,
-  ): Promise<{
-    output: WorkflowOutput<WF>;
-    extras: Record<string, unknown>;
-  }>;
-};
-
-export type Module<
-  S extends ServiceRegistry,
-  WF extends Record<string, WorkflowDef<any, any>>,
-> = WF;

@@ -1,7 +1,7 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import { createModule } from "../../src/workflow-module";
+import { buildWF } from "../../src/";
 
 import { createRuntime, StandardServices, useLog } from "../../src";
 import { baseServices, createMeta } from "../../src/utils";
@@ -11,50 +11,38 @@ type PayService = {
   };
 };
 
-const mod = createModule<StandardServices & { stripe: PayService["stripe"] }>();
+const wf = buildWF<StandardServices & { stripe: PayService["stripe"] }>();
 
-const subchild = mod(({ wf }) => ({
-  loc: wf<any, any>("loc")
-    .seq("a", (ctx) => ctx.math.add(2, 2))
-    .output((ctx) => ctx.get("a")),
+const loc = wf((_) => ({
+  a: _.math.add(2, 2),
+  out: _.steps.a,
 }));
 
-const child = mod(({ wf }) => {
-  const pay = wf<{ amount: number }, any>("payment")
-    .init("pay_init")
-    .seq("payment", (ctx) => ctx.stripe.charge(ctx.get("pay_init").amount))
-
-    .output((ctx) => ctx.get("payment"));
-
-  return { pay };
-});
-
-const local = mod(({ wf }) => ({
-  st: wf<any, any>("st")
-    .seq("st", (ctx) => ctx.stripe.charge(333))
-    .build(),
-  localOne: wf<{ input: boolean }, any>("macro_1")
-    .seq("add", (ctx) => ctx.math.add(2, 3))
-    .output((ctx) => ctx.get("add")),
-  localTwo: wf<any, any>("macro_2")
-    // .init("i")
-    .seq("adding 2 and 3", (ctx) => ctx.math.add(2, 3))
-    .output((ctx) => ctx.get("adding 2 and 3")),
+const pay = wf((_) => ({
+  payment: _.stripe.charge(_.steps.i.amount),
+  out: _.steps.payment,
 }));
 
-const parent = mod(({ wf }) => {
-  const test = wf<any, any>("test")
-    .init("i")
-    .sub("macro", local.localTwo, () => ({}))
-    .sub("result", child.pay, () => ({
-      amount: 400,
-    }))
+const st = wf((_) => ({
+  st: _.stripe.charge(333),
+}));
 
-    .seq("sum_2_test", (ctx) => ctx.math.add(ctx.math.add(2, 3), 10))
-    .output((ctx) => ctx.get("result"));
+const localOne = wf((_) => ({
+  add: _.math.add(2, 3),
+  out: _.steps.add,
+}));
 
-  return { test, macroOne: local.localOne };
-});
+const localTwo = wf((_) => ({
+  add: _.math.add(2, 3),
+  out: _.steps.add,
+}));
+
+const test = wf<{ i: { amount: number } }>((_) => ({
+  macro: _.SUB(localTwo),
+  result: _.SUB(pay, { amount: 400 }),
+  sum: _.math.add(_.math.add(2, 3), 10),
+  out: _.steps.result,
+}));
 
 const s = baseServices
   .add("stripe", {
@@ -70,7 +58,7 @@ describe("Service injection", () => {
       meta: createMeta().service("stripe", { async: true }).build(),
     });
 
-    const r0 = await root.run(parent.test, { amount: 44 });
+    const r0 = await root.exec(test, { amount: 44 });
 
     expect(r0.output).toEqual({ paid: true, amount: 400 });
   });

@@ -1,4 +1,3 @@
-import { isCallExpr, isPlainObject, isRefExpr } from "./ast.js";
 import { buildLevels } from "./build-levels.js";
 
 import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
@@ -7,30 +6,15 @@ import {
   CompilerCtx,
   ExecutionPlan,
   Expr,
-  ResultsArray,
   StepDef,
   StepExecutor,
   WorkflowDef,
 } from "./types.js";
+import { isCallExpr, isPlainObject, isRefExpr } from "./workflow.js";
 
-export function readResult(results: ResultsArray, idx: number): any {
-  let current: ResultsArray = results;
-
-  while (current) {
-    if (Object.prototype.hasOwnProperty.call(current, idx)) {
-      return current[idx];
-    }
-
-    current = current.__parent!;
-  }
-
-  return undefined;
-}
 function generateExprCode(
   expr: Expr,
   ctx: CompilerCtx,
-
-  // allocFn: () => string,
 ): {
   code: string;
   async: boolean;
@@ -63,7 +47,7 @@ function generateExprCode(
 
     // let code = `readResult(rt.results, ${ref})`;
 
-    parts.push(`readResult(rt.results, ${ref})`);
+    parts.push(`rt.results[${ref}]`);
     for (const p of path) {
       parts.push(`?.[${JSON.stringify(p)}]`);
       // code += `?.[${JSON.stringify(p)}]`;
@@ -172,9 +156,9 @@ function createStepExecutor(step: StepDef, ctx: CompilerCtx): StepExecutor {
         return ${generated.code};
       `;
 
-  const compiled = new Function("rt", "readResult", body);
+  const compiled = new Function("rt", body);
 
-  return (rt) => compiled(rt, readResult);
+  return (rt) => compiled(rt);
 }
 
 export function compileStep(step: StepDef, ctx: CompilerCtx): CompiledStep {
@@ -186,39 +170,26 @@ export function compileStep(step: StepDef, ctx: CompilerCtx): CompiledStep {
     options: step.options,
     spec: step.spec,
     resolve: step.resolve ? createStepExecutor(step, ctx) : null,
-    pipe: step.pipe
-      ? {
-          mode: step.pipe.mode,
-          plan: (step.pipe as any).plan, // <- already recursively compiled
-        }
-      : undefined,
+    ...(step?.pipeMode && { pipeMode: step.pipeMode }),
+    ...((step as any)?.plan && { plan: (step as any).plan }),
   };
 }
 
 export function compileWorkflow(
   workflow: WorkflowDef<any, any>,
   ctx: CompilerCtx,
+  cache: Map<string, ExecutionPlan>,
 ): ExecutionPlan {
-  let outputIndex: number | undefined;
-
-  let exitIndexes: number[] | undefined;
-
-  if (workflow.outputIdx !== undefined) {
-    outputIndex = workflow.outputIdx;
-  } else if (workflow.endSteps?.length) {
-    exitIndexes = workflow.endSteps.map((s) => s.idx);
+  if (cache.has(workflow.__id)) {
+    return cache.get(workflow.__id) as ExecutionPlan;
   }
 
   const compiledSteps = workflow.steps.map((step: any) => {
-    if (step.pipe?.workflow) {
+    if (step.ast) {
       return {
         ...step,
-
-        pipe: {
-          ...step.pipe,
-
-          plan: compileWorkflow(step.pipe.workflow, ctx),
-        },
+        ...(step?.pipeMode && { pipeMode: step.pipeMode }),
+        plan: compileWorkflow(step.ast, ctx, cache),
       };
     }
 
@@ -231,13 +202,16 @@ export function compileWorkflow(
     level.map((step) => compileStep(step, ctx)),
   );
 
-  const maxIndex = Math.max(...workflow.steps.map((s: any) => s.idx));
+  const maxIndex = workflow.steps.length - 1;
 
-  return {
+  const plan = {
     initIdx: workflow.initIdx ?? undefined,
     levels: compiledLevels,
-    outputIndex,
-    exitIndexes: exitIndexes ?? [],
+    outputIndex: workflow.outputIdx,
     maxIndex,
   };
+
+  cache.set(workflow.__id, plan);
+
+  return plan;
 }

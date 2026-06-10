@@ -2,7 +2,6 @@ import { compileWorkflow } from "./ast-compiler.js";
 import { createExecutor } from "./executor.js";
 import {
   ExecutionPlan,
-  Module,
   RuntimeOptions,
   ServiceMetaRegistry,
   ServiceRegistry,
@@ -11,14 +10,23 @@ import {
   WorkflowOutput,
 } from "./types.js";
 
+type RunFn = {
+  <WF extends WorkflowDef<any, any>>(
+    ...args: WorkflowInput<WF> extends never
+      ? [wf: WF]
+      : [wf: WF, input: WorkflowInput<WF>]
+  ): Promise<{
+    output: WorkflowOutput<WF>;
+    extras: Record<string, unknown>;
+  }>;
+};
+
 export function createRuntime<S extends ServiceRegistry>({
-  precompileModules,
   precompileWorkflows,
   services,
   meta,
   options,
 }: {
-  precompileModules?: Module<any, any>[];
   precompileWorkflows?: WorkflowDef<any, any>[];
   services: S;
   meta?: ServiceMetaRegistry<any>;
@@ -29,60 +37,76 @@ export function createRuntime<S extends ServiceRegistry>({
   const precompile = (wfs?: WorkflowDef<any, any>[]) => {
     if (wfs?.length) {
       for (const wf of wfs ?? []) {
-        if (!compiledCache.has(wf.__id)) {
-          compiledCache.set(wf.__id, compileWorkflow(wf, { meta }));
-        }
+        compileWorkflow(wf, { meta }, compiledCache);
       }
     }
   };
 
   precompile(precompileWorkflows);
 
-  if (precompileModules?.length) {
-    const wfs = precompileModules.flatMap((m) =>
-      Object.values(m),
-    ) as WorkflowDef<any, any>[];
-    precompile(wfs);
-  }
+  const exec = (async (wf: any, input?: any): Promise<any> => {
+    const plan = compileWorkflow(wf, { meta }, compiledCache);
 
-  return {
-    run: async <WF extends WorkflowDef<any, any>>(
-      wf: WF,
-      input: WorkflowInput<WF>,
-    ): Promise<{
-      output: WorkflowOutput<WF>;
-      extras: Record<string, unknown>;
-    }> => {
-      if (!compiledCache.has(wf.__id)) {
-        compiledCache.set(wf.__id, compileWorkflow(wf, { meta }));
+    if (!plan) {
+      throw new Error(`Compiled plan not found`);
+    }
+
+    const executor = createExecutor(
+      plan,
+      services as any,
+      options?.global?.observers ?? [],
+    );
+
+    const results = new Array(plan.maxIndex + 1);
+
+    if (typeof plan.initIdx === "number") {
+      if (input !== undefined) {
+        results[plan.initIdx] = input;
       }
+    }
 
-      const plan = compiledCache.get(wf.__id);
+    const output = await executor(results, {});
 
-      console.log("plans", compiledCache);
+    return {
+      output,
+      extras: {},
+    };
+  }) as RunFn;
 
-      if (!plan) {
-        throw new Error(`Compiled plan not found`);
-      } else {
-        const executor = createExecutor(
-          plan,
-          services as any,
-          options?.global?.observers ?? [],
-        );
+  return { exec };
 
-        const results = new Array(plan.maxIndex + 1);
-
-        if (typeof plan.initIdx === "number") {
-          results[plan.initIdx] = input;
-        }
-
-        const output = await executor(results, {});
-
-        return {
-          output,
-          extras: {},
-        };
-      }
-    },
-  };
+  // return {
+  //   run: async <WF extends WorkflowDef<any, any>>(
+  //     wf: WF,
+  //     input: WorkflowInput<WF>,
+  //   ): Promise<{
+  //     output: WorkflowOutput<WF>;
+  //     extras: Record<string, unknown>;
+  //   }> => {
+  //     const plan = compileWorkflow(wf, { meta }, compiledCache);
+  //
+  //     if (!plan) {
+  //       throw new Error(`Compiled plan not found`);
+  //     } else {
+  //       const executor = createExecutor(
+  //         plan,
+  //         services as any,
+  //         options?.global?.observers ?? [],
+  //       );
+  //
+  //       const results = new Array(plan.maxIndex + 1);
+  //
+  //       if (typeof plan.initIdx === "number") {
+  //         results[plan.initIdx] = input;
+  //       }
+  //
+  //       const output = await executor(results, {});
+  //
+  //       return {
+  //         output,
+  //         extras: {},
+  //       };
+  //     }
+  //   },
+  // };
 }

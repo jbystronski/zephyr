@@ -1,7 +1,7 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import { createModule } from "../../src/workflow-module";
+import { buildWF } from "../../src";
 
 import {
   baseServices,
@@ -17,44 +17,33 @@ type PayService = {
   };
 };
 
-const mod = createModule<StandardServices & { stripe: PayService["stripe"] }>();
+const wf = buildWF<StandardServices & { stripe: PayService["stripe"] }>();
 
-const deepChildSecond = mod(({ wf }) => ({
-  deepChildActionSecond: wf<{ init: string }, any>("deepChildActionSecond")
-    .init("init")
-    .seq("actionSecond", (ctx) => ctx.string.upper(ctx.get("init").init))
-    .output((ctx) => ({ deepRes: ctx.get("actionSecond") })),
+const deepChildSecond = wf<{ i: { init: string }; out: { deepRes: string } }>(
+  (_) => ({
+    actionSecond: _.string.upper(_.steps.i.init),
+    out: { deepRes: _.steps.actionSecond },
+  }),
+);
+
+const deepChild = wf<{ out: { deepRes: string }; i: { init: string } }>(
+  ({ steps: s, string }) => ({
+    action: string.upper(s.i.init),
+    out: { deepRes: s.action },
+  }),
+);
+
+const sum = wf<{ i: { a: number; b: number }; out: number }>((_) => ({
+  add: _.math.add(_.steps.i.a, _.steps.i.b),
+  payment: _.stripe.charge(444),
+  out: _.steps.add,
 }));
 
-const deepChild = mod(({ wf }) => ({
-  deepChildAction: wf<{ init: string }, any>("deepChildAction")
-    .init("d2_init")
-    .seq("action", (ctx) => ctx.string.upper(ctx.get("d2_init").init))
-    .output((ctx) => ({ deepRes: ctx.get("action") })),
+const test = wf<{ out: number }>((_) => ({
+  deepAction: _.SUB(deepChild, { init: "abc" }),
+  result: _.SUB(sum, { a: 2, b: 3 }),
+  out: _.steps.result,
 }));
-
-const child = mod(({ wf }) => ({
-  sum: wf<{ a: number; b: number }, any>("sum")
-    .init("d3_init")
-    .seq("add", (ctx) =>
-      ctx.math.add(ctx.get("d3_init").a, ctx.get("d3_init").b),
-    )
-    .seq("payment", (ctx) => ctx.stripe.charge(444))
-
-    .output((ctx) => ctx.get("add")),
-  deepAction: deepChild.deepChildAction,
-}));
-
-// type T = DepWorkflows<{ child: typeof child }>;
-
-const parent = mod(({ wf }) => {
-  const test = wf<any, any>("test")
-    .sub("deepAction", child.deepAction, () => ({ init: "abc" }))
-    .sub("result", child.sum, () => ({ a: 2, b: 3 }))
-    .output((ctx) => ctx.get("result"));
-
-  return { test, sub: child.sum };
-});
 
 const s = baseServices
   .add("stripe", {
@@ -69,7 +58,7 @@ describe("Subflow", () => {
       meta: createMeta().service("stripe", { async: true }).build(),
     });
 
-    const res = await root.run(parent.test, {});
+    const res = await root.exec(test);
 
     // const childRes = childRt.run("sum")
     expect(res.output).toBe(5);

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { createModule } from "../../src/workflow-module";
 
 import {
   baseServices,
+  buildWF,
   createRuntime,
   eventStream,
   StandardServices,
@@ -24,124 +24,77 @@ type ExplorerObject = {
   };
 };
 
-const mod = createModule<StandardServices>();
+const wf = buildWF<StandardServices>();
 
-const modB = mod(({ wf }) => ({
-  createExplorerObject: wf<
-    { key: string; parent?: ExplorerObject },
-    {
-      i: { key: string; parent?: ExplorerObject };
-      ["type of object"]: "branch" | "root";
-      created: ExplorerObject;
-    }
-  >("create explorer object")
-    .init("i")
-    .seq("type of object", ({ std, get }) =>
-      std.if(get("i").parent, "branch", "root"),
-    )
-    .seq(
-      "created",
-      ({ std, get }) =>
-        ({
-          label: get("i").key,
-          parent: get("i").parent,
-          type: get("type of object"),
-          raw: {
-            name: get("i").key,
-            kind: "bucket",
-          },
-        }) satisfies ExplorerObject,
-    )
+const accessChained = wf<{ i: { nestedObject: { foo: { bar: string } } } }>(
+  (_) => ({
+    extract: _.object.get(_.steps.i.nestedObject, "foo").bar,
+    out: _.steps.extract,
+  }),
+);
 
-    .output(({ get }) => get("created")),
-
-  findObject: wf<
-    { data: ExplorerObject[]; key: string },
-    {
-      i: { data: ExplorerObject[]; key: string };
-      ["has key"]: boolean;
-      ["find pipe"]: ExplorerObject | undefined;
-      item: ExplorerObject;
-      ["match label"]: boolean;
-    }
-  >("find obejct")
-    .init("i")
-    .if(
-      "has key",
-      ({ logic: { truthy }, get }) => truthy(get("i").key),
-      (b) =>
-        b.pipe(
-          "find pipe",
-          "find",
-          ({ get }) => get("i").data,
-          (b) =>
-            b
-              .init("item")
-              .seq("match label", ({ get, logic: { eq } }) =>
-                eq(get("i").key, get("item").label),
-              ),
-        ),
-    )
-    .output(({ get }) => ({ found: get("find pipe") })),
-}));
-
-const modA = mod(({ wf }) => ({
-  createObjects: wf<
-    { initData: { label: string; kind: string }[] },
-    { i: any; ["p 1"]: any; item: any }
-  >("create objects")
-    .init("i")
-    .pipe(
-      "p 1",
-      "map",
-      ({ get }) => get("i").initData,
-      (b) =>
-        b
-          .init("item")
-          .sub("new object", modB.createExplorerObject, ({ get }) => ({
-            key: get("item").label,
-          })),
-    )
-
-    .output(({ get }) => ({
-      objects: get("p 1"),
-    })),
-  findObject: modB.findObject,
-}));
-
-const modC = mod(({ wf }) => ({
-  accessChained: wf<
-    { nestedObject: { foo: { bar: string } } },
-    { i: any; extract: any }
-  >("access chain")
-    .init("i")
-    .seq("extract", (_) => _.object.get(_.get("i").nestedObject, "foo").bar)
-    .output((_) => _.get("extract")),
-
-  createObjectsAndFind: wf<
-    {
-      keyToFind: string;
-      initData: { label: string; kind: string }[];
+const createExplorerObject = wf<{
+  i: { key: string; parent?: ExplorerObject };
+}>((_) => ({
+  typeOfObject: _.std.if(_.steps.i.parent, "branch", "root"),
+  created: {
+    label: _.steps.i.key,
+    parent: _.steps.i.parent,
+    type: _.steps.typeOfObject,
+    raw: {
+      name: _.steps.i.key,
+      kind: "bucket",
     },
-    {
-      i: any;
-      ["created objects"]: any;
-      find: WorkflowOutput<typeof modA.findObject>;
-    }
-  >("create object and find by key")
-    .init("i")
-    .sub("created objects", modA.createObjects, ({ get }) => ({
-      initData: get("i").initData,
-    }))
-
-    .sub("find", modA.findObject, ({ get }) => ({
-      data: get("created objects").objects,
-      key: get("i").keyToFind,
-    }))
-    .output(({ get }) => ({ found: get("find").found })),
+  },
+  out: _.steps.created,
 }));
 
-console.dir(modC.accessChained, { depth: 16 });
+//TODO: error in this tests, some weird guard propagation issues
+const findObject = wf<{ data: ExplorerObject[]; key: string }>((_) => ({
+  noop: null,
+  hasKey: _.IF(_.logic.truthy(_.steps.i.key), {
+    findPipe: _.PIPE(
+      "find",
+      _.steps.i.data,
+      { key: _.steps.i.key },
+      wf<{ i: { item: any; key: string } }>((_) => ({
+        out: _.logic.eq(_.steps.i.key, _.steps.i.item.label),
+      })),
+    ),
+  }),
+  out: { found: _.steps.findPipe },
+}));
+
+const createObjects = wf<{
+  i: { initData: { label: string; kind: string }[] };
+  out: { objects: any[] };
+}>((_) => ({
+  p1: _.PIPE(
+    "map",
+    _.steps.i.initData,
+    {},
+    wf<{ i: { item: any } }>((_) => ({
+      obj: _.SUB(createExplorerObject, { key: _.steps.i.item.label }),
+      out: _.steps.obj,
+    })),
+  ),
+  out: { objects: _.steps.p1 },
+}));
+
+const createObjectsAndFind = wf<{
+  i: { keyToFind: string; initData: { label: string; kind: string }[] };
+  out: { found: any };
+}>((_) => ({
+  createdObject: _.SUB(createObjects, { initData: _.steps.i.initData }),
+  find: _.SUB(findObject, {
+    data: _.steps.createdObject.objects,
+    key: _.steps.i.keyToFind,
+  }),
+  out: { found: _.steps.find.found },
+}));
+
+console.log("create objects and find wf");
+console.dir(createObjectsAndFind, { depth: 16 });
 
 const services = baseServices.build();
 
@@ -149,7 +102,7 @@ const rt = createRuntime({ services });
 
 describe("Various tests", () => {
   it("should correctly return objects array created from piped subflow", async () => {
-    const testOne = await rt.run(modA.createObjects, {
+    const testOne = await rt.exec(createObjects, {
       initData: [
         { kind: "bucket", label: "emails" },
         { kind: "bucket", label: "configs" },
@@ -179,7 +132,7 @@ describe("Various tests", () => {
   });
 
   it("should access AST value chained on call expression resolution", async () => {
-    const testChained = await rt.run(modC.accessChained, {
+    const testChained = await rt.exec(accessChained, {
       nestedObject: { foo: { bar: "BAZ" } },
     });
 
@@ -187,7 +140,7 @@ describe("Various tests", () => {
   });
 
   it("should correctly return find explorer object if key exists", async () => {
-    const testTwo = await rt.run(modC.createObjectsAndFind, {
+    const testTwo = await rt.exec(createObjectsAndFind, {
       initData: [
         { kind: "bucket", label: "emails" },
         { kind: "bucket", label: "configs" },

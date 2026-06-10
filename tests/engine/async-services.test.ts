@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { createModule } from "../../src/workflow-module";
 
 import {
+  buildWF,
   createRuntime,
   eventStream,
   type StandardServices,
@@ -26,35 +26,34 @@ const meta = createMeta<typeof services>()
   })
   .build();
 
-const mod = createModule<StandardServices & { pay: typeof payService }>();
+const wf = buildWF<StandardServices & { pay: typeof payService }>();
 
-const A = mod(({ wf }) => ({
-  pay: wf<
-    null,
-    { ["pay async direct"]: any; ["pay async nested"]: any; ["pay sync"]: any }
-  >("pay")
-    .seq("pay async direct", (_) => _.pay.charge(33))
-    .seq("pay async nested", (_) => ({
-      charged: _.pay.charge(44),
-    }))
-    .seq("pay sync", (_) => _.pay.chargeSync(22))
-    .output((_) => ({
-      a: _.get("pay async direct").amount,
-      b: _.get("pay async nested").charged.amount,
-      c: _.get("pay sync").amount,
-      d: {
-        charged: {
-          nested: _.pay.charge(11),
-        },
-      },
-    })),
-}));
+const pay = wf<{
+  payAsyncDirect: { amount: number };
+  paySync: { amount: number };
+  payAsyncNested: any;
+}>(
+  ({
+    steps: { payAsyncDirect, paySync, payAsyncNested },
+    pay: { charge, chargeSync },
+  }) => ({
+    payAsyncDirect: charge(33),
+    payAsyncNested: { charged: charge(44) },
+    paySync: chargeSync(22),
+    out: {
+      a: payAsyncDirect.amount,
+      b: payAsyncNested.charged.amount,
+      c: paySync.amount,
+      d: { charged: { nested: charge(11) } },
+    },
+  }),
+);
 
 describe("Sync vs Async methods", () => {
   it("should correctly resolve sync call, async call (nested and direct)", async () => {
     const root = createRuntime({ services, meta });
 
-    const a = await root.run(A.pay, null);
+    const a = await root.exec(pay);
 
     expect(a.output).toEqual({
       a: 33,

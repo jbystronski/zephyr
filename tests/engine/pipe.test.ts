@@ -1,7 +1,7 @@
 // /tests/modules/subflow.test.ts
 
 import { describe, it, expect } from "vitest";
-import { createModule } from "../../src/workflow-module";
+import { buildWF } from "../../src";
 
 import {
   baseServices,
@@ -63,144 +63,81 @@ const transformables: Transformable[] = [
   },
 ];
 
-const createMod = createModule<
+const wf = buildWF<
   StandardServices & {
     s1: S1;
   }
 >();
 
-const testPipe = createMod(({ wf }) => {
-  const findFirstArcticBird = wf<
-    { data: Transformable[] },
-    {
-      i: any;
-      firstArctictBird: Transformable | undefined;
-      animal: Transformable;
-      first: boolean;
-    }
-  >("firstArcticBirdTest")
-    .init("i")
-    .pipe(
-      "firstArctictBird",
-      "find",
-      ({ get }) => get("i").data,
-      (b) =>
-        b
-          .init("animal")
-          .seq("first", ({ get, logic: { and, eq } }) =>
-            and(
-              eq(get("animal").kind, "bird"),
-              eq(get("animal").climate, "arctic"),
-            ),
-          ),
-    )
-    .output(({ get }) => get("firstArctictBird"));
+const findFirstArcticBird = wf<{ i: { data: Transformable[] } }>((_) => ({
+  firstBird: _.PIPE(
+    "find",
+    _.steps.i.data,
+    {},
+    wf((_) => ({
+      out: _.logic.and(
+        _.logic.eq(_.steps.i.item.kind, "bird"),
+        _.logic.eq(_.steps.i.item.climate, "arctic"),
+      ),
+    })),
+  ),
+  out: _.steps.firstBird,
+}));
 
-  const someAreTropical = wf<
-    { data: Transformable[] },
-    {
-      i: { data: Transformable[] };
-      someAreTropical: boolean;
-      animal: Transformable;
-      first: boolean;
-    }
-  >("someAreTropical")
-    .init("i")
-    .pipe(
-      "someAreTropical",
-      "some",
-      ({ get }) => get("i").data,
-      (b) =>
-        b
-          .init("animal")
-          .seq("first", ({ get, logic: { and, eq } }) =>
-            and(eq(get("animal").climate, "tropical")),
-          ),
-    )
-    .output(({ get }) => get("someAreTropical"));
+const someAreTropical = wf<{ i: { data: Transformable[] } }>((_) => ({
+  some: _.PIPE(
+    "some",
+    _.steps.i.data,
+    {},
+    wf((_) => ({
+      out: _.logic.eq(_.steps.i.item.climate, "tropical"),
+    })),
+  ),
+  out: _.steps.some,
+}));
 
-  const everyIsArctic = wf<
-    { data: Transformable[] },
-    { i: any; everyIsArctic: any; animal: Transformable; first: any }
-  >("everyIsArctic")
-    .init("i")
-    .pipe(
-      "everyIsArctic",
-      "every",
-      ({ get }) => get("i").data,
-      (b) =>
-        b
-          .init("animal")
-          .seq("first", ({ get, logic: { and, eq } }) =>
-            and(eq(get("animal").climate, "arctic")),
-          ),
-    )
-    .output(({ get }) => get("everyIsArctic"));
+const everyIsArctic = wf<{ i: { data: Transformable[] } }>((_) => ({
+  every: _.PIPE(
+    "every",
+    _.steps.i.data,
+    {},
+    wf((_) => ({
+      out: _.logic.eq(_.steps.i.item.climate, "arctic"),
+    })),
+  ),
+  out: _.steps.every,
+}));
 
-  const reptilesOnly = wf<
-    { data: Transformable[] },
-    { i: any; reptilesOnly: any; animal: any; first: any }
-  >("reptilesOnly")
-    .init("i")
-    .pipe(
-      "reptilesOnly",
-      "filter",
-      ({ get }) => get("i").data,
-      (b) =>
-        b
-          .init("animal")
-          .seq("first", ({ get, logic: { and, eq } }) =>
-            and(eq(get("animal").kind, "reptile")),
-          ),
-    )
-    .output(({ get }) => get("reptilesOnly"));
+const reptilesOnly = wf<{ i: { data: Transformable[] } }>((_) => ({
+  filter: _.PIPE(
+    "filter",
+    _.steps.i.data,
+    {},
+    wf((_) => ({
+      out: _.logic.eq(_.steps.i.item.kind, "reptile"),
+    })),
+  ),
+  out: _.steps.filter,
+}));
 
-  const test = wf<
-    { elements: string[]; another: string },
-    {
-      init: any;
-      add_animal: any;
-      pv2: any;
-      pv2_init: any;
-      upp: any;
-      pref: any;
-      suffix: any;
-      enrich: any;
-    }
-  >("pipeElements")
-    .init("init")
-    .seq("add_animal", (_) =>
-      _.s1.addAnimal({
-        initArray: _.get("init").elements,
-        newAnimal: _.get("init").another,
-      }),
-    )
-
-    .pipe(
-      "pv2",
-      "map",
-      ({ get }) => get("add_animal"),
-      (b) =>
-        b
-          .init("pv2_init")
-          .seq("upp", (ctx) => ctx.string.upper(ctx.get("pv2_init")))
-          .seq("pref", ({ std: { concat }, get }) => concat("<", get("upp")))
-          .seq("suffix", ({ std: { concat }, get }) => concat(get("pref"), ">"))
-          .seq("enrich", ({ std: { concat }, get }) =>
-            concat(get("suffix"), "!"),
-          ),
-    )
-
-    .output((_) => _.get("pv2"));
-
-  return {
-    test,
-    findFirstArcticBird,
-    someAreTropical,
-    everyIsArctic,
-    reptilesOnly,
-  };
-});
+const test = wf<{ i: { elements: string[]; another: string } }>((_) => ({
+  add: _.s1.addAnimal({
+    initArray: _.steps.i.elements,
+    newAnimal: _.steps.i.another,
+  }),
+  pv2: _.PIPE(
+    "map",
+    _.steps.add,
+    {},
+    wf((_) => ({
+      upp: _.string.upper(_.steps.i.item),
+      pref: _.std.concat("<", _.steps.upp),
+      suffix: _.std.concat(_.steps.pref, ">"),
+      out: _.std.concat(_.steps.suffix, "!"),
+    })),
+  ),
+  out: _.steps.pv2,
+}));
 
 const s = baseServices
   .add("s1", {
@@ -216,7 +153,7 @@ const r0 = createRuntime({ services: s });
 
 describe("Pipe", () => {
   it("should execute pipe and return result", async () => {
-    const res = await r0.run(testPipe.test, {
+    const res = await r0.exec(test, {
       elements: ["cat", "dog", "bird"],
       another: "fish",
     });
@@ -225,7 +162,7 @@ describe("Pipe", () => {
   });
 
   it("should return first matching result from pipe", async () => {
-    const r = await r0.run(testPipe.findFirstArcticBird, {
+    const r = await r0.exec(findFirstArcticBird, {
       data: transformables,
     });
 
@@ -237,7 +174,7 @@ describe("Pipe", () => {
   });
 
   it("should evaluate some pipe condtion to true", async () => {
-    const r = await r0.run(testPipe.someAreTropical, {
+    const r = await r0.exec(someAreTropical, {
       data: transformables,
     });
 
@@ -245,7 +182,7 @@ describe("Pipe", () => {
   });
 
   it("should evaluate every pipe condtion to false", async () => {
-    const r = await r0.run(testPipe.everyIsArctic, {
+    const r = await r0.exec(everyIsArctic, {
       data: transformables,
     });
 
@@ -253,7 +190,7 @@ describe("Pipe", () => {
   });
 
   it("should filter reptiles", async () => {
-    const r = await r0.run(testPipe.reptilesOnly, {
+    const r = await r0.exec(reptilesOnly, {
       data: transformables,
     });
 

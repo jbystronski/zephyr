@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createModule } from "../../src/workflow-module";
+import { buildWF } from "../../src/";
 
 import { createRuntime, useLog } from "../../src";
 
@@ -24,46 +24,30 @@ describe("Retry handling at action level", () => {
       },
     };
 
-    const createMod = createModule<{ math: (typeof actions)["math"] }>();
+    const wf = buildWF<{ math: (typeof actions)["math"] }>();
 
-    // Child workflow with retry on the action itself
-    const child = createMod(({ wf }) => {
-      const failStep = wf<{ a: number; b: number }, any>("failStep")
-        .init("failInit")
-        .seq(
-          "subAdd",
+    const failStep = wf<{ i: { a: number; b: number }; subAdd: number }>(
+      (_) => ({
+        subAdd: _.math.subAdd(_.steps.i.a, _.steps.i.b),
+        out: _.steps.subAdd,
+        __meta: {
+          subAdd: { retry: { count: 4 } },
+        },
+      }),
+    );
 
-          (ctx) =>
-            ctx.math.subAdd(ctx.get("failInit").a, ctx.get("failInit").b),
-          { retry: { count: 4 } }, // <--- retry on the action itself
-        )
-        .output((ctx) => ctx.get("subAdd"));
-
-      return { failStep };
-    });
-
-    // Parent workflow
-    const parent = createMod(({ wf }) => {
-      const test = wf<{ x: number; y: number }, any>("test")
-        .init("test_init")
-        .seq(
-          "a",
-
-          (ctx) => ctx.math.add(ctx.get("test_init").x, ctx.get("test_init").y),
-          { retry: { count: 3 } }, // retry on the parent action
-        )
-        .sub("b", child.failStep, (ctx) => ({
-          a: ctx.get("a"),
-          b: 10,
-        }))
-        .output((ctx) => ({ a: ctx.get("a"), b: ctx.get("b") }));
-
-      return { test };
-    });
+    const test = wf<{ i: { x: number; y: number }; a: number }>((_) => ({
+      a: _.math.add(_.steps.i.x, _.steps.i.y),
+      b: _.SUB(failStep, { a: _.steps.a, b: 10 }),
+      out: { a: _.steps.a, b: _.steps.b },
+      __meta: {
+        a: { retry: { count: 3 } },
+      },
+    }));
 
     const r0 = createRuntime({ services: actions });
 
-    const res = await r0.run(parent.test, { x: 1, y: 2 });
+    const res = await r0.exec(test, { x: 1, y: 2 });
 
     // ✅ Verify retry counts
     expect(retriesA).toBe(2); // retried once
