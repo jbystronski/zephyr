@@ -7,6 +7,7 @@ import {
   StepDef,
   StepOptions,
   WorkflowDef,
+  WorkflowInput,
   WorkflowOutput,
 } from "./types.js";
 import { uniqueId } from "./utils.js";
@@ -27,7 +28,7 @@ type WorkflowCtx<SR extends ServiceRegistry, Schema extends StepSchema> = SR & {
 
   SUB: <T extends WorkflowDef<any, any>>(
     wf: T,
-    input?: any,
+    input?: WorkflowInput<T>,
   ) => WorkflowOutput<T>;
 
   PIPE: <T>(mode: PipeMode, iterable: any[], input: any, value: any) => T;
