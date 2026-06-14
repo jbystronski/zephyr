@@ -258,7 +258,8 @@ function compileAST(
           id,
           idx: idToIdx[id],
           spec: "__sub__",
-          guards: [...activeGuards],
+          // guards: [...activeGuards],
+          ...(activeGuards?.length && { guards: [...activeGuards] }),
 
           resolve: subInputResolve,
           dependsOn: [
@@ -290,8 +291,8 @@ function compileAST(
             ...new Set([...extractDeps(pipeInputResolve), ...activeGuards]),
           ],
 
-          guards: [...activeGuards],
-
+          // guards: [...activeGuards],
+          ...(activeGuards?.length && { guards: [...activeGuards] }),
           resolve: pipeInputResolve,
 
           pipeMode: (expr as any).__mode,
@@ -316,8 +317,8 @@ function compileAST(
           dependsOn: [
             ...new Set([...extractDeps(condResolve), ...activeGuards]),
           ],
-
-          guards: [...activeGuards],
+          ...(activeGuards?.length && { guards: [...activeGuards] }),
+          // guards: [...activeGuards],
           ...(meta[id] && { options: meta[id] }),
         });
 
@@ -339,13 +340,18 @@ function compileAST(
         outputIdx = idx;
       }
 
+      // const mergedDeps = [...new Set([...deps, ...activeGuards])];
+
       steps.push({
         id,
         idx,
-        resolve,
+        // resolve,
+        ...(resolve && { resolve }),
         dependsOn: [...new Set([...deps, ...activeGuards])],
-        guards: [...activeGuards],
 
+        // ...(mergedDeps?.length && { dependsOn: mergedDeps }),
+        // guards: [...activeGuards],
+        ...(activeGuards?.length && { guards: [...activeGuards] }),
         ...(meta[id] && { options: meta[id] }),
       });
     }
@@ -357,9 +363,10 @@ function compileAST(
     __id,
     __stack,
     steps,
-    guards,
+    // guards,
+    ...(guards?.length && { guards }),
     initIdx,
-    outputIdx,
+    ...(typeof outputIdx === "number" && { outputIdx }),
   };
 }
 
