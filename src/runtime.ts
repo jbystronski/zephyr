@@ -47,8 +47,6 @@ export function createRuntime<S extends ServiceRegistry>({
   const exec = (async (wf: any, input?: any): Promise<any> => {
     const plan = compileWorkflow(wf, { meta }, compiledCache);
 
-    console.dir(plan, { depth: 17 });
-    console.log(JSON.stringify(plan));
     if (!plan) {
       throw new Error(`Compiled plan not found`);
     }

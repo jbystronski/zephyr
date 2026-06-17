@@ -63,7 +63,6 @@ function generateExprCode(
   if (isCallExpr(expr)) {
     // const fn = ctx.services[expr.__service]?.[expr.__method];
 
-    console.log("META", ctx.meta);
     const serviceMeta = ctx.meta?.[expr.__service];
     const methodMeta = serviceMeta?.methods?.[expr.__method];
 
@@ -157,8 +156,6 @@ function createStepExecutor(step: StepDef, ctx: CompilerCtx): StepExecutor {
     : `
         return ${generated.code};
       `;
-
-  console.log("fn body", body);
 
   const compiled = new Function("rt", body);
 
