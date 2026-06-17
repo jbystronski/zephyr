@@ -1,6 +1,4 @@
 import { buildLevels } from "./build-levels.js";
-
-import { COMPILED_GRAPH, DEPS, EXEC_GRAPH } from "./symbols.js";
 import {
   CompiledStep,
   CompilerCtx,
