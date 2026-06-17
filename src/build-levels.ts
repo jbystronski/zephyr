@@ -9,13 +9,13 @@ export function buildLevels(steps: StepDef[]): StepDef[][] {
 
   // BUILD GRAPH
   for (const step of steps) {
-    remainingDeps.set(step.idx, step.dependsOn.length);
+    remainingDeps.set(step.idx, step.deps.length);
 
-    if (step.dependsOn.length === 0) {
+    if (step.deps.length === 0) {
       ready.push(step.idx);
     }
 
-    for (const dep of step.dependsOn) {
+    for (const dep of step.deps) {
       if (dep === undefined || dep === null) continue; // Handle undefined deps
       let arr = dependents.get(dep);
       if (!arr) {

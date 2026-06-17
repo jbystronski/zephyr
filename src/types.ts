@@ -8,7 +8,6 @@ import { mathLib } from "./services/math.js";
 import { miscLib } from "./services/misc.js";
 import { objectLib } from "./services/object.js";
 import { stringLib } from "./services/string.js";
-import { DEPS, EXEC_GRAPH, MODULE_ID } from "./symbols.js";
 
 export type WorkflowDef<I, O> = {
   __id: string;
@@ -19,7 +18,7 @@ export type WorkflowDef<I, O> = {
   guards: number[];
 };
 
-export type StepKey = string;
+// export type StepKey = string;
 
 export type StepSchema = Record<string, any>;
 
@@ -35,7 +34,8 @@ export type WorkflowOutput<T> =
 export type StepDef = {
   id: string;
   idx: number;
-  dependsOn: number[];
+  deps: number[];
+  // dependsOn: number[];
   guards?: number[];
   resolve: Expr;
   options?: StepOptions;

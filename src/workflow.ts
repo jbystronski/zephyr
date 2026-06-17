@@ -4,17 +4,19 @@ import {
   PipeMode,
   Primitive,
   RefExpr,
+  ServiceRegistry,
   StepDef,
   StepOptions,
+  StepSchema,
   WorkflowDef,
   WorkflowInput,
   WorkflowOutput,
 } from "./types.js";
 import { uniqueId } from "./utils.js";
 
-type StepSchema = Record<string, any>;
+// type ServiceRegistry = Record<string, any>;
 
-type ServiceRegistry = Record<string, any>;
+type Mapper<T> = (iterable: any[], input: any, value: any) => T;
 
 type StepRefs<S extends StepSchema> = { [K in keyof S]: S[K] } & Record<
   string,
@@ -32,6 +34,13 @@ type WorkflowCtx<SR extends ServiceRegistry, Schema extends StepSchema> = SR & {
   ) => WorkflowOutput<T>;
 
   PIPE: <T>(mode: PipeMode, iterable: any[], input: any, value: any) => T;
+
+  __map: Mapper<any[]>;
+  __filter: Mapper<any[]>;
+  __count: Mapper<number>;
+  __find: Mapper<any | undefined>;
+  __some: Mapper<boolean>;
+  __every: Mapper<boolean>;
 };
 
 type WorkflowShape<Schema extends StepSchema> = {
@@ -262,7 +271,7 @@ function compileAST(
           ...(activeGuards?.length && { guards: [...activeGuards] }),
 
           resolve: subInputResolve,
-          dependsOn: [
+          deps: [
             ...new Set([...extractDeps(subInputResolve), ...activeGuards]),
           ],
           ...(meta[id] && { options: meta[id] }),
@@ -287,7 +296,7 @@ function compileAST(
           idx,
           spec: "__pipe__",
 
-          dependsOn: [
+          deps: [
             ...new Set([...extractDeps(pipeInputResolve), ...activeGuards]),
           ],
 
@@ -314,9 +323,7 @@ function compileAST(
           idx,
           resolve: condResolve,
 
-          dependsOn: [
-            ...new Set([...extractDeps(condResolve), ...activeGuards]),
-          ],
+          deps: [...new Set([...extractDeps(condResolve), ...activeGuards])],
           ...(activeGuards?.length && { guards: [...activeGuards] }),
           // guards: [...activeGuards],
           ...(meta[id] && { options: meta[id] }),
@@ -347,7 +354,7 @@ function compileAST(
         idx,
         // resolve,
         ...(resolve && { resolve }),
-        dependsOn: [...new Set([...deps, ...activeGuards])],
+        deps: [...new Set([...deps, ...activeGuards])],
 
         // ...(mergedDeps?.length && { dependsOn: mergedDeps }),
         // guards: [...activeGuards],
