@@ -45,6 +45,7 @@ export type StepDef = {
 };
 
 export type StepOptions = {
+  wait?: string[];
   timeout?: number;
 
   retry?: {

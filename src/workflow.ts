@@ -208,6 +208,22 @@ function remapExpr(expr: Expr, idToIdx: Record<string, number>): Expr {
   return out;
 }
 
+function getWaitDeps(
+  meta: Record<string, StepOptions>,
+  id: string,
+  idToIdx: Record<string, number>,
+): number[] {
+  const waits = meta[id]?.wait ?? [];
+
+  for (const dep of waits) {
+    if (!(dep in idToIdx)) {
+      throw new Error(`Unknown wait dependency '${dep}' on step '${id}'`);
+    }
+  }
+
+  return waits.map((stepId) => idToIdx[stepId]);
+}
+
 function compileAST(
   shape: Record<string, Expr>,
   meta: Record<string, StepOptions> = {},
@@ -272,7 +288,11 @@ function compileAST(
 
           resolve: subInputResolve,
           deps: [
-            ...new Set([...extractDeps(subInputResolve), ...activeGuards]),
+            ...new Set([
+              ...extractDeps(subInputResolve),
+              ...activeGuards,
+              ...getWaitDeps(meta, id, idToIdx),
+            ]),
           ],
           ...(meta[id] && { options: meta[id] }),
 
@@ -297,7 +317,11 @@ function compileAST(
           spec: "__pipe__",
 
           deps: [
-            ...new Set([...extractDeps(pipeInputResolve), ...activeGuards]),
+            ...new Set([
+              ...extractDeps(pipeInputResolve),
+              ...activeGuards,
+              ...getWaitDeps(meta, id, idToIdx),
+            ]),
           ],
 
           // guards: [...activeGuards],
@@ -323,7 +347,13 @@ function compileAST(
           idx,
           resolve: condResolve,
 
-          deps: [...new Set([...extractDeps(condResolve), ...activeGuards])],
+          deps: [
+            ...new Set([
+              ...extractDeps(condResolve),
+              ...activeGuards,
+              ...getWaitDeps(meta, id, idToIdx),
+            ]),
+          ],
           ...(activeGuards?.length && { guards: [...activeGuards] }),
           // guards: [...activeGuards],
           ...(meta[id] && { options: meta[id] }),
@@ -354,7 +384,13 @@ function compileAST(
         idx,
         // resolve,
         ...(resolve && { resolve }),
-        deps: [...new Set([...deps, ...activeGuards])],
+        deps: [
+          ...new Set([
+            ...deps,
+            ...activeGuards,
+            ...getWaitDeps(meta, id, idToIdx),
+          ]),
+        ],
 
         // ...(mergedDeps?.length && { dependsOn: mergedDeps }),
         // guards: [...activeGuards],
